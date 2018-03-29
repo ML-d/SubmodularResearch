@@ -1,9 +1,11 @@
 from __future__ import division
 from __future__ import print_function
-from create_model import  *
-from read_data import *
-from policies import *
-from submodular_optimisation import *
+import sys
+import numpy as np
+sys.path.append("/Users/kris/Desktop/ijcai2k18/code/")
+from new_code.read_data import *
+from new_code.policies import *
+from new_code.create_model import *
 
 import argparse
 import tensorflow as tf
@@ -34,7 +36,7 @@ def softmax(x):
 
 
 def train_model(model, x_train, y_train, x_test, y_test,
-                dataset, batch_size, loss_function,
+                dataset, batch_size, fwd_batch_size, loss_function,
                 num_epoch, num_exp, sampler,
                 steps_per_epoch, folder):
     """
@@ -68,15 +70,15 @@ def train_model(model, x_train, y_train, x_test, y_test,
         model.fit (x_train[temp_idx], y_train[temp_idx], batch_size=batch_size, epochs=burn_in_epoch)
 
         if sampler == 'ssgd':
-            sampler = SelectSSGD (loss_function)
+            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, loss_function)
         elif sampler == 'random':
-            sampler = SelectRandom (loss_function)
+            sampler = SelectRandom ( x_train, y_train, fwd_batch_size, batch_size, loss_function)
         elif sampler == 'loss':
-            sampler = SelectLoss (loss_function)
+            sampler = SelectLoss ( x_train, y_train, fwd_batch_size, batch_size, loss_function)
         elif sampler == 'entropy':
-            sampler = SelectEntropy (loss_function)
+            sampler = SelectEntropy ( x_train, y_train, fwd_batch_size, batch_size, loss_function)
         elif sampler == 'flid':
-            sampler = SelectFlid (loss_function)
+            sampler = SelectFlid ( x_train, y_train, fwd_batch_size, batch_size, loss_function)
         # Make selection
         epoch = 0
         num_epoch = num_epoch
@@ -156,6 +158,9 @@ def main():
     num_batches = (x_train.shape[0] / args.batch_size)
     model = create_model (x_train.shape[1:], y_train.shape[1], args.loss_function, args.dataset)
     train_model (model, x_train, y_train, x_test, y_test,
-                 args.dataset, args.batch_size,
+                 args.dataset, args.batch_size, args.fwd_batch_size,
                  args.loss_function, args.num_epoch,
                  args.num_exp, args.sampler, args.steps_per_epoch, args.folder)
+
+if __name__ == "__main__":
+    main()

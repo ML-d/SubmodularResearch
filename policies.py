@@ -3,14 +3,10 @@ import sys
 import tensorflow as tf
 import keras.backend as K
 from keras.models import Model
-from submodular_optimisation import *
+from new_code.submodular_optimisation import *
 from scipy.stats import entropy
 from keras.losses import sparse_categorical_crossentropy
 
-
-def printdbg(expression):
-    frame = sys._getframe(1)
-    print(expression, '=', repr(eval(expression, frame.f_globals, frame.f_locals)))
 
 class SelectSSGD:
     """
@@ -25,7 +21,7 @@ class SelectSSGD:
     link : http://ieeexplore.ieee.org/document/6912976/
     """
 
-    def __init__(self, X, Y, fwd_batch_size, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, loss):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -39,8 +35,9 @@ class SelectSSGD:
         self.X = X
         self.Y = Y
         self.fwd_batch_size = fwd_batch_size
+        self.batch_size = batch_size
         self.loss = loss
-        self.idx = []
+        self.candidate_points = []
         self.entropy = None
 
 
@@ -49,7 +46,7 @@ class SelectSSGD:
         Computes the fwd_batch
         :return: Subsampled data points to make selection from.
         """
-        self.idx = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size)
+        self.candidate_points = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size)
 
     def compute_entropy(self, model):
         """
@@ -59,8 +56,8 @@ class SelectSSGD:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.entropy = dict(zip(self.idx, map(lambda  x: entropy(x),
-                                              model.predict_proba (self.X[self.idx]))))
+        self.entropy = dict(zip(self.candidate_points, map(lambda  x: entropy(x),
+                                              model.predict_proba (self.X[self.candidate_points]))))
 
     def ent(self, idx):
         """
@@ -145,7 +142,7 @@ class SelectSSGD:
         ent = self.ent(idx)
         diversity = self.diversity (idx, data_points)
         dist = self.distance (idx, data_points)
-        printdbg(ent, diversity, dist)
+        print("ent, diversity, dist", ent, diversity, dist)
         return ent + diversity + dist
 
     def sample(self, model):
@@ -161,7 +158,7 @@ class SelectSSGD:
         """
         self.forward_batch_size()
         self.entropy = None
-        optimizer = LazyGreedy (self.marginal_gain, self.idx)
+        optimizer = LazyGreedy (self.X, self.Y, self.marginal_gain, self.candidate_points, self.batch_size)
         optimizer.sample ()
         return optimizer.sample_points
 
@@ -180,7 +177,7 @@ class SelectEntropy:
     ----------------------------------------------------------------------------------
     """
 
-    def __init__(self, X, Y, fwd_batch_size, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, loss):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -191,7 +188,11 @@ class SelectEntropy:
         :param loss: loss function
         """
         self.loss = loss
-        self.idx = []
+        self.fwd_batch_size = fwd_batch_size
+        self.batch_size = batch_size
+        self.X = X
+        self.Y = Y
+        self.candidate_points = []
         self.entropy = None
 
     def create_fwd_batch(self):
@@ -202,7 +203,7 @@ class SelectEntropy:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.idx = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size)
+        self.candidate_points = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size)
 
     def compute_entropy(self, model):
         """
@@ -212,8 +213,8 @@ class SelectEntropy:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.entropy = dict(zip(self.idx, map(lambda  x: entropy(x),
-                                              model.predict_proba (self.X[self.idx]))))
+        self.entropy = dict(zip(self.candidate_points, map(lambda  x: entropy(x),
+                                              model.predict_proba (self.X[self.candidate_points]))))
 
     def marginal_gain(self, idx, _):
         """
@@ -240,8 +241,8 @@ class SelectEntropy:
         """
         self.create_fwd_batch()
         self.entropy = None
-        optimizer = LazyGreedy (self.marginal_gain, self.idx)
-        optimizer.sample ()
+        optimizer = LazyGreedy (self.X, self.Y, self.marginal_gain, self.candidate_points, self.batch_size)
+        optimizer.sample (model)
         return optimizer.sample_points
 
 
@@ -256,7 +257,7 @@ class SelectFlid:
     --------------------------------------------------------------------------------------------------------
     """
 
-    def __init__(self, X, Y, fwd_batch_size, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, loss):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -271,9 +272,11 @@ class SelectFlid:
 
         self.X = X
         self.Y = Y
-        self.fwd_batch = []
+
         self.loss = loss
+        self.candidate_points = []
         self.fwd_batch_size = fwd_batch_size
+        self.batch_size =batch_size
         self.entropy = None
         self.features = None
 
@@ -286,7 +289,7 @@ class SelectFlid:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.idx = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size)
+        self.candidate_points = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size)
 
     def compute_entropy(self, model):
         """
@@ -296,8 +299,8 @@ class SelectFlid:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.entropy = dict(zip(self.idx, map(lambda  x: -entropy(x),
-                                              model.predict_proba (self.X[self.idx]))))
+        self.entropy = dict(zip(self.candidate_points, map(lambda  x: -entropy(x),
+                                              model.predict_proba (self.X[self.candidate_points]))))
 
     def compute_features(self, model):
         """"
@@ -309,7 +312,7 @@ class SelectFlid:
         """
         intermediate_layer_model = Model (inputs=model.input,
                                           outputs=model.get_layer("features").output)
-        self.features = dict(zip(self.idx, intermediate_layer_model.predict(self.X[self.idx])))
+        self.features = dict(zip(self.candidate_points, intermediate_layer_model.predict(self.X[self.candidate_points])))
 
     def modular(self, idx):
         """
@@ -344,7 +347,7 @@ class SelectFlid:
 
         print(self.features[data_points[0]].shape)
 
-
+        print(feature_matrix.shape)
         tot = np.sum(feature_matrix, axis=1)
         temp_matrix = feature_matrix - tot
         max_col = np.max(temp_matrix, axis=1)
@@ -359,16 +362,16 @@ class SelectFlid:
 
 
 
-    def marginal_gain(self, idx, data_points):
+    def marginal_gain(self, idx, model, data_points):
         """
         Computes the entropy of the given data points
         :param idx: Element being added
         :return:
         """
         if self.entropy == None:
-            self.compute_entropy()
+            self.compute_entropy(model)
         if self.features == None:
-            self.compute_features()
+            self.compute_features(model)
         return self.modular(idx) + self.distance(idx, data_points)
 
     def sample(self, model):
@@ -379,8 +382,8 @@ class SelectFlid:
         self.create_fwd_batch()
         self.entropy = None
         self.features = None
-        optimizer = LazyGreedy (self.marginal_gain, self.idx)
-        optimizer.sample ()
+        optimizer = LazyGreedy (self.X, self.Y, self.marginal_gain, self.candidate_points, self.batch_size)
+        optimizer.sample (model)
         return optimizer.sample_points
 
 
@@ -391,7 +394,7 @@ class SelectLoss:
         No need of rejection sampling.
     """
 
-    def __init__(self, X, Y, fwd_batch_size, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, loss):
         """
         :param loss: loss function
         :param x_train: training dataN
@@ -400,6 +403,7 @@ class SelectLoss:
         self.X = X
         self.Y = Y
         self.fwd_batch_size = fwd_batch_size
+        self.batch_size = batch_size
         self.loss = loss
 
     def sample(self, model, batch_size, dataset):
