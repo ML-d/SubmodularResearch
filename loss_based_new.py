@@ -17,12 +17,6 @@ config = tf.ConfigProto ()
 config.gpu_options.per_process_gpu_memory_fraction = 0.3
 set_session (tf.Session (config=config))
 
-
-
-
-
-
-
 def main():
 
     parser = argparse.ArgumentParser (add_help=True)
