@@ -107,7 +107,7 @@ class LazyGreedy (Optimisation):
         index: index of the element in X
         freshness: 0/1 indicates if the elements if fresh or not.
 
-        Link: http://melodi.ee.washington.edu/~bilmes/ee595a_spring_2011/lecture19.pdf
+        Link: http://j.ee.washington.edu/~bilmes/classes/ee596b_spring_2014/lecture19.pdf
         Using Lazy Greedy algorithm along lazier than lazy greedy.
         Compute the set of points S such that argmax_S:|S|<k f(S)
         Algo
@@ -128,7 +128,7 @@ class LazyGreedy (Optimisation):
 
         heapq.heapify (self.priority_queue)
         temp = []
-        for i in range (0, self.cardinality):
+        while(len(temp)<self.cardinality):
             x = heapq.heappop (self.priority_queue)
             if x[2] == 0:
                 alpha = fnc (x[1], model, self.sample_points)
@@ -136,12 +136,10 @@ class LazyGreedy (Optimisation):
             if x[2] == 1 or alpha > max (self.priority_queue, key=itemgetter (0))[0]:
                 self.sample_points.append (x[1])
                 temp.append(x[1])
-
                 for i in self.priority_queue:
                     i = list (i)
                     i[2] = 0
                     i = tuple (i)
-
             else:
                 heapq.heappush (self.priority_queue, (fnc (x[1], model, self.sample_points), x[1], 1))
         return temp

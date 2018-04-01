@@ -328,7 +328,6 @@ class SelectFlid:
 
         return self.entropy[idx]
 
-
     def distance(self, idx, data_points):
         """
         --------------------------------------------------------------
@@ -362,8 +361,6 @@ class SelectFlid:
         new_max_col = np.max(temp_matrix, axis=0)
 
         return np.sum(new_max_col) - np.sum(max_col)
-
-
 
     def marginal_gain(self, idx, model, data_points):
         """
