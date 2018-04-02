@@ -47,7 +47,11 @@ class SelectSSGD:
         Computes the fwd_batch
         :return: Subsampled data points to make selection from.
         """
-        self.candidate_points = np.random.choice (np.arange (0, self.X.shape[0]), size= self.fwd_batch_size, replace=False)
+        t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.optimizer.sample_points)
+        if t >= self.fwd_batch_size:
+            self.candidate_points = np.random.choice (t, size= self.fwd_batch_size, replace=False)
+        else:
+            raise("Error")
 
     def compute_entropy(self, model):
         """
@@ -199,8 +203,11 @@ class SelectEntropy:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.candidate_points = np.random.choice (np.arange (0, self.X.shape[0]), size=self.fwd_batch_size,
-                                                  replace=False)
+        t = np.setdiff1d (np.arange (0, self.X.shape[0]), self.optimizer.sample_points)
+        if t >= self.fwd_batch_size:
+            self.candidate_points = np.random.choice (t, size=self.fwd_batch_size, replace=False)
+        else:
+            raise ("Error")
 
     def compute_entropy(self, model):
         """
@@ -284,9 +291,11 @@ class SelectFlid:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.candidate_points = np.random.choice (np.arange (0, self.X.shape[0]),
-                                                  size=self.fwd_batch_size,
-                                                  replace=False)
+        t = np.setdiff1d (np.arange (0, self.X.shape[0]), self.optimizer.sample_points)
+        if t >= self.fwd_batch_size:
+            self.candidate_points = np.random.choice (t, size=self.fwd_batch_size, replace=False)
+        else:
+            raise ("Error")
 
     def compute_entropy(self, model, data_points):
         """

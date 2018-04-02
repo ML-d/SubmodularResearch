@@ -2,6 +2,7 @@ from __future__ import division
 from __future__ import print_function
 import sys
 sys.path.append("/Users/kris/Desktop/ijcai2k18/code/")
+print(sys.path)
 from new_code.create_model import *
 from new_code.read_data import *
 from new_code.train import *

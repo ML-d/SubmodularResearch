@@ -67,7 +67,6 @@ class Greedy (Optimisation):
         """
         temp = []
         for i in range (0, self.cardinality):
-            candidate_points = list (set (candidate_points) - set (self.sample_points))
             max_val = -1000000
             for j in candidate_points:
                 present_val = fnc (j, model, self.sample_points)
@@ -174,7 +173,6 @@ class ProbGreedy (Optimisation):
         temp = []
 
         for i in range (0, self.cardinality):
-            candidate_points = np.setdiff1d(candidate_points, self.sample_points)
             prob_candidate_points = np.zeros(candidate_points.shape)
             for k, v in enumerate (candidate_points):
                 prob_candidate_points[k] = fnc (v, model, self.sample_points)
