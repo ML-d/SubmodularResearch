@@ -1,12 +1,12 @@
 import numpy as np
-import sys
+import operator
 import heapq
 
 from operator import itemgetter
 from abc import ABC, abstractmethod
 
 class Optimisation (ABC):
-    def __init__(self, X, Y, batch_size):
+    def __init__(self, X, Y, fwd_batch_size, batch_size):
         """
         -------------------------------------------------
         :param X: Set of Data points
@@ -18,7 +18,9 @@ class Optimisation (ABC):
         self.X = X
         self.Y = Y
         self.cardinality = batch_size
+        self.fwd_batch_size = fwd_batch_size
         self.sample_points = []
+        self.candidate_points = []
 
     def softmax(self, x, t=0.01):
         """
@@ -33,6 +35,14 @@ class Optimisation (ABC):
 
         x = list (map (lambda i: np.exp ((1.0 / float (t)) * i), x))
         return x / np.sum (x)
+
+    def create_fwd_batch(self):
+        """
+        Computes the fwd_batch
+        :return: Subsampled data points to make selection from.
+        """
+        t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.sample_points)
+        self.candidate_points = np.random.choice (t, size= self.fwd_batch_size, replace=False)
 
     @abstractmethod
     def sample(self, candidate_points):
@@ -59,7 +69,7 @@ class Greedy (Optimisation):
         """
         super (Greedy, self).__init (X, Y, batch_size)
 
-    def sample(self, model, fnc, candidate_points):
+    def sample(self, model, fnc):
         """
 
         :param max_val:
@@ -68,8 +78,9 @@ class Greedy (Optimisation):
         temp = []
         for i in range (0, self.cardinality):
             max_val = -1000000
-            for j in candidate_points:
-                present_val = fnc (j, model, self.sample_points)
+            self.create_fwd_batch ()
+            for j in self.candidate_points:
+                present_val = fnc (j, model, self. candidate_points, self.sample_points)
                 if present_val > max_val:
                     max_idx = j
                     max_val = present_val
@@ -77,7 +88,7 @@ class Greedy (Optimisation):
             temp.append(max_idx)
         return temp
 
-
+# Todo fix this
 class LazyGreedy (Optimisation):
     """
         This implementation is equivalent to lazier than lazy greedy.
@@ -96,7 +107,7 @@ class LazyGreedy (Optimisation):
         super (LazyGreedy, self).__init__ (X, Y, batch_size)
 
 
-    def sample(self, model, fnc, candidate_points):
+    def sample(self, model, fnc):
         """
         -----------------------------------------------------------------------------------
 
@@ -119,11 +130,11 @@ class LazyGreedy (Optimisation):
         ------------------------------------------------------------------------------------
         :return: set of k data points that maximisize the given function S
         """
-
+        self.create_fwd_batch ()
         self.priority_queue = list (
-            zip (list (map (lambda x: fnc (x, model, self.sample_points), candidate_points)),
-                 candidate_points,
-                 [0] * len (candidate_points)))
+            zip (list (map (lambda x: fnc (j, model, self. candidate_points,self.sample_points)), self.candidate_points)),
+            self.candidate_points,
+            [0] * len (self.candidate_points))
 
         heapq.heapify (self.priority_queue)
         temp = []
@@ -158,7 +169,7 @@ class ProbGreedy (Optimisation):
 
         super (ProbGreedy, self).__init__  (X, Y, batch_size)
 
-    def sample(self, model, fnc, candidate_points):
+    def sample(self, model, fnc):
         """
         Using the PD-Greedy Algorithm for selection of
         items based on probablistic greedy algorithm.
@@ -173,12 +184,13 @@ class ProbGreedy (Optimisation):
         temp = []
 
         for i in range (0, self.cardinality):
-            prob_candidate_points = np.zeros(candidate_points.shape)
-            for k, v in enumerate (candidate_points):
-                prob_candidate_points[k] = fnc (v, model, self.sample_points)
+            self.create_fwd_batch()
+            prob_candidate_points = np.zeros(self.candidate_points.shape)
+            for k, v in enumerate (self.candidate_points):
+                prob_candidate_points[k] = fnc (v, model, self.candidate_points, self.sample_points)
 
             prob_candidate_points = self.softmax (prob_candidate_points)
-            t = np.random.choice (candidate_points, size=1, p=prob_candidate_points)
+            t = np.random.choice (self.candidate_points, size=1, p=prob_candidate_points)
             temp.extend(t)
             self.sample_points.extend(t)
         print(temp)

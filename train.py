@@ -47,11 +47,11 @@ def train_model(model, x_train, y_train, x_test, y_test,
         model.fit (x_train[temp_idx], y_train[temp_idx], batch_size=batch_size, epochs=burn_in_epoch)
 
         if optimizer == "Greedy":
-            optimizer = Greedy (x_train, y_train, batch_size)
+            optimizer = Greedy (x_train, y_train, fwd_batch_size, batch_size)
         elif optimizer == "LazyGreedy":
-            optimizer = LazyGreedy (x_train, y_train, batch_size)
+            optimizer = LazyGreedy (x_train, y_train, fwd_batch_size, batch_size)
         elif optimizer == "ProbGreedy":
-            optimizer = ProbGreedy (x_train, y_train, batch_size)
+            optimizer = ProbGreedy (x_train, y_train, fwd_batch_size, batch_size)
 
         if sampler == 'ssgd':
             sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function)

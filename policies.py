@@ -37,23 +37,11 @@ class SelectSSGD:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
-        self.candidate_points = []
         self.entropy = None
         self.optimizer = optimizer
 
 
-    def create_fwd_batch(self):
-        """
-        Computes the fwd_batch
-        :return: Subsampled data points to make selection from.
-        """
-        t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.optimizer.sample_points)
-        if t >= self.fwd_batch_size:
-            self.candidate_points = np.random.choice (t, size= self.fwd_batch_size, replace=False)
-        else:
-            raise("Error")
-
-    def compute_entropy(self, model):
+    def compute_entropy(self, model, candidate_points):
         """
         -------------------------------------------------------------------------------
         Computes the entropy for all of the data points in fwd_batch.
@@ -61,18 +49,18 @@ class SelectSSGD:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.entropy = dict(zip(self.candidate_points, map(lambda  x: entropy(x),
-                                              model.predict_proba (self.X[self.candidate_points]))))
+        self.entropy = dict(zip(candidate_points, map(lambda  x: entropy(x),
+                                              model.predict_proba (self.X[candidate_points]))))
 
-    def ent(self, idx, model):
+    def ent(self, idx, model, candidate_points):
         """
         :return: The entropy of data point index by idx in the original data.
         """
         if self.entropy == None:
-            self.compute_entropy (model)
+            self.compute_entropy (model, candidate_points)
         return self.entropy[idx]
 
-    def distance(self, idx, sampled_points, kernel="fro"):
+    def distance(self, idx, candidate_points, sampled_points, kernel="fro"):
         """
         -------------------------------------------------------------------------------
         Compute the distance term for no duplicates.
@@ -103,7 +91,7 @@ class SelectSSGD:
 
         return min_dist
 
-    def diversity(self, idx, sampled_points, kernel="fro"):
+    def diversity(self, idx, candidate_points, sampled_points, kernel="fro"):
         """
         --------------------------------------------------------------------------------
         Compute the diversity term of el based on the sampled points.
@@ -132,7 +120,7 @@ class SelectSSGD:
 
         return dist
 
-    def marginal_gain(self, idx, model, data_points):
+    def marginal_gain(self, idx, model, candidate_points, data_points):
         """
         -------------------------------------------------------------------
         Computes the SSGD value of the given data point indexed by idx
@@ -142,10 +130,11 @@ class SelectSSGD:
         :return:
         """
         kernel = "fro"
-        ent = self.ent(idx, model)
-        diversity = self.diversity (idx, data_points, kernel)
-        dist = self.distance (idx, data_points, kernel)
+        ent = self.ent(idx, model, candidate_points)
+        diversity = self.diversity (idx, candidate_points, data_points, kernel)
+        dist = self.distance (idx, candidate_points, data_points, kernel)
         return ent + diversity + dist
+
 
     def sample(self, model):
         """
@@ -158,9 +147,8 @@ class SelectSSGD:
         -------------------------------------------------------------------
         :return Sampled data points of cardianlity k
         """
-        self.create_fwd_batch ()
         self.entropy = None
-        return self.optimizer.sample (model, self.marginal_gain, self.candidate_points)
+        return self.optimizer.sample (model, self.marginal_gain)
 
 class SelectEntropy:
     """
@@ -191,23 +179,8 @@ class SelectEntropy:
         self.batch_size = batch_size
         self.X = X
         self.Y = Y
-        self.candidate_points = []
         self.entropy = None
         self.optimizer = optimizer
-
-    def create_fwd_batch(self):
-        """
-        -------------------------------------------------------------------------------
-        Computes the entropy for all of the data points in fwd_batch.
-        This needs to be done only once since entropy is independent of sampled points.
-        -------------------------------------------------------------------------------
-        :return: Dictionary of entropy for all of the data points in fwd_batch.
-        """
-        t = np.setdiff1d (np.arange (0, self.X.shape[0]), self.optimizer.sample_points)
-        if t >= self.fwd_batch_size:
-            self.candidate_points = np.random.choice (t, size=self.fwd_batch_size, replace=False)
-        else:
-            raise ("Error")
 
     def compute_entropy(self, model):
         """
