@@ -47,11 +47,13 @@ class SelectSSGD:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
-        self.entropy = {}
-        self.features = {}
+        self.entropy = np.empty(shape=(X.shape[0], 1))
+        self.features = []
         self.optimizer = optimizer
         self.kernel = kernel
         self.max_entropy = 1
+        self.sum_distance = 0
+        self.min_distance = 0
 
 
     def compute_entropy(self, model, candidate_points, sampled_points):
@@ -70,16 +72,37 @@ class SelectSSGD:
             idx = np.hstack((candidate_points, sampled_points))
             idx = idx.astype("int")
             prob, feat= intermediate_layer_model.predict (self.X[idx])
-            self.entropy = dict (zip (idx, list(map(lambda i:entropy(i), prob))))
-            self.features = dict (zip (idx, list(feat)))
+            ent = np.array([entropy(i) for i in prob]).reshape((len(idx), 1))
+            self.entropy[idx] = ent
+            self.features = np.empty(shape=((self.X.shape[0], feat.shape[1])))
+            self.features[idx] = feat
         else:
             prob, feat = intermediate_layer_model.predict (self.X[candidate_points])
             self.entropy = dict (zip (candidate_points, entropy(prob)))
 
         end_time = time.time()
-        self.max_entropy = max(self.entropy.values())
+        self.entropy = normalize(self.entropy, axis=0)
         tot = int(end_time - start_time)
-        print("{a} min {b} sec".format(a=tot // 60, b=tot%60))
+        print("Forward Pass {a} min {b} sec".format(a=tot // 60, b=tot%60))
+
+    def compute_distance(self, model, candidate_points, sampled_points):
+        start_time = time.time ()
+        self.sum_distance = np.zeros((self.X.shape[0], 1))
+        self.min_distance = np.zeros_like(self.sum_distance)
+        idx = np.hstack ((candidate_points, sampled_points))
+        self.features = normalize(self.features, axis=1)
+        feat_candidates = self.features[candidate_points]
+        feat_sample = self.features[sampled_points]
+        feat_mat = np.dot(feat_candidates, np.transpose(feat_sample))
+        feat_mat = np.ones_like(feat_mat) - feat_mat
+        pv("feat_mat.shape")
+        self.sum_distance[candidate_points] = np.expand_dims(feat_mat.sum(axis=1) / feat_mat.shape[1], axis=1)
+        pv("self.sum_distance.shape")
+        self.min_distance[candidate_points] = np.expand_dims(np.min(feat_mat, axis=1), axis=1)
+        pv("self.sum_distance.shape")
+        end_time = time.time()
+        tot = int (end_time - start_time)
+        print ("Computation time {a} min {b} sec".format (a=tot // 60, b=tot % 60))
 
     def ent(self, idx, model, candidate_points):
         """
@@ -91,7 +114,9 @@ class SelectSSGD:
         """
         -------------------------------------------------------------------------------
         Compute the distance term for no duplicates.
+        and Compute the diversity term of el based on the sampled points.
         distance = min \phi(el, sampled_points)
+        diversity = \frac{1}{N} \sum \phi(el, sampled_points)
         Algo
         ----
         1. If length of sampled points is 0 then return 0
@@ -105,51 +130,17 @@ class SelectSSGD:
         min_dist = 1000000
         if self.kernel == "l2":
             if len(sampled_points) == 0:
-                return 0
-            for i in sampled_points:
-                a = self.features[idx]/np.linalg.norm(self.features[idx])
-                b = self.features[i]/np.linalg.norm(self.features[i])
-                min_dist = min (cosine(a, b), min_dist)
+                return (0, 0)
+            else:
+                return (self.sum_distance[idx], self.min_distance[idx])
 
-        if self.kernel == "fro":
+        else:
             if len(sampled_points) == 0:
                 return 0
             for i in sampled_points:
                 min_dist = min (np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2), "fro"),
                                 min_dist)
-
-        return min_dist
-
-    def diversity(self, idx, candidate_points, sampled_points):
-        """
-        --------------------------------------------------------------------------------
-        Compute the diversity term of el based on the sampled points.
-        diversity = \frac{1}{N} \sum \phi(el, sampled_points)
-        --------------------------------------------------------------------------------
-        :param el: Candidate point
-        :param sampled_points: Set of points already in the selected set.
-        :return: average kernelized distance of the candidate from sampled points
-
-        """
-        if self.kernel == "l2":
-            dist = 0
-            if len(sampled_points) == 0:
-                return dist
-            for i in sampled_points:
-                a = self.features[idx] / np.linalg.norm (self.features[idx])
-                b = self.features[i] / np.linalg.norm (self.features[i])
-                dist += cosine(a, b)
-            dist / len (sampled_points)
-
-        if self.kernel == "fro":
-            dist = 0
-            if len(sampled_points) == 0:
-                return dist
-            for i in sampled_points:
-                dist += np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2), "fro")
-            dist / len (sampled_points)
-
-        return dist
+            return (min_dist, 0)
 
     def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
@@ -163,9 +154,12 @@ class SelectSSGD:
         alpha, beta, gamma = 0.4, 1, 1
         if compute_entropy == 1:
             self.compute_entropy(model, candidate_points, sampled_points)
+        if compute_entropy == 1 and len(sampled_points) > 0:
+            self.compute_distance(model, candidate_points, sampled_points)
         ent = self.ent(idx, model, candidate_points)
-        diversity = self.diversity (idx, candidate_points, sampled_points)
-        dist = self.distance (idx, candidate_points, sampled_points)
+        # diversity = self.diversity (idx, candidate_points, sampled_points)
+        # this computes both distance and diversity
+        dist, diversity = self.distance (idx, candidate_points, sampled_points)
         # pv("alpha*ent, beta*diversity, gamma*dist")
         return alpha * ent + beta * diversity + gamma * dist
 
