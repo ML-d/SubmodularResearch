@@ -47,7 +47,7 @@ class SelectSSGD:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
-        self.entropy = np.empty(shape=(X.shape[0], 1))
+        self.entropy = np.zeros_like(shape=(X.shape[0], 1))
         self.features = []
         self.optimizer = optimizer
         self.kernel = kernel
@@ -73,7 +73,7 @@ class SelectSSGD:
             idx = idx.astype("int")
             prob, feat= intermediate_layer_model.predict (self.X[idx])
             ent = np.array([entropy(i) for i in prob]).reshape((len(idx), 1))
-            if np.isnan(ent) or np.isinf(ent):
+            if any(np.isnan(ent)) or any(np.isinf(ent)):
                 raise("Error")
             self.entropy[idx] = ent
             self.features = np.empty(shape=((self.X.shape[0], feat.shape[1])))
