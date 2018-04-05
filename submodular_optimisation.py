@@ -1,12 +1,15 @@
 import numpy as np
 import operator
+import sys
+import bisect
 import heapq
+from collections import  OrderedDict
 
 from operator import itemgetter
 from abc import ABC, abstractmethod
 
 class Optimisation (ABC):
-    def __init__(self, X, Y, fwd_batch_size, batch_size):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, approx_factor):
         """
         -------------------------------------------------
         :param X: Set of Data points
@@ -21,6 +24,7 @@ class Optimisation (ABC):
         self.fwd_batch_size = fwd_batch_size
         self.sample_points = []
         self.candidate_points = []
+        self.k = approx_factor
 
     def softmax(self, x, t=0.01):
         """
@@ -43,6 +47,7 @@ class Optimisation (ABC):
         """
         t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.sample_points)
         self.candidate_points = np.random.choice (t, size= self.fwd_batch_size, replace=False)
+        assert (len(self.candidate_points)==self.fwd_batch_size)
 
     @abstractmethod
     def sample(self, candidate_points):
@@ -58,7 +63,7 @@ class Greedy (Optimisation):
         This implementation is equivalent to the lazier than lazy greedy algorithm.
     """
 
-    def __int__(self, X, Y, fnc, batch_size):
+    def __int__(self, X, Y, fwd_batch_size, batch_size, approx_factor):
         """
             -------------------------------------------------
             :param X: Set of Data points
@@ -67,7 +72,7 @@ class Greedy (Optimisation):
             :param fwd_batch: The set of sampled points
             -------------------------------------------------
         """
-        super (Greedy, self).__init (X, Y, batch_size)
+        super (Greedy, self).__init (X, Y, fwd_batch_size, batch_size, approx_factor)
 
     def sample(self, model, fnc):
         """
@@ -76,17 +81,73 @@ class Greedy (Optimisation):
         :return:
         """
         temp = []
-        for i in range (0, self.cardinality):
-            max_val = -1000000
+        val = []
+        for i in range(0, self.k):
             self.create_fwd_batch ()
+            compute_entropy = 1
             for j in self.candidate_points:
-                present_val = fnc (j, model, self. candidate_points, self.sample_points)
-                if present_val > max_val:
-                    max_idx = j
-                    max_val = present_val
-            self.sample_points.append (max_idx)
-            temp.append(max_idx)
+                val.append((j, fnc (j, model, self. candidate_points, self.sample_points, compute_entropy)))
+                compute_entropy = 0
+            sorted(val, key=itemgetter(1), reverse=True)
+            keys = [i[0] for i in val]
+            self.sample_points.extend (keys[0:self.cardinality// self.k])
+            temp.extend(keys[0:self.cardinality// self.k])
         return temp
+
+class dictionary_heap(object):
+
+    def __init__(self):
+        self.d = []
+
+    def __getitem__(self, item):
+        return dict(self.d)[item]
+
+    def __setitem__(self, key, val):
+        # It insert item in an sorted way.
+        temp = dict(self.d)
+        if key in temp:
+            self.insert(key, val)
+        else:
+            raise("Key Error. Not found {s}".format(s=key))
+
+    def __contains__(self, item):
+        temp = dict(self.d)
+        if item in temp:
+            return  True
+        else:
+            return  False
+
+    def __iter__(self):
+        return iter(self.d)
+
+    def max(self):
+        print(self.d)
+        return max(self.d, key=itemgetter(1))[1]
+
+    def update(self, item):
+        if isinstance(item, tuple):
+            self.d.append(item)
+        else:
+            raise ("Item should be a tuple. Item is of type{s}".format(s=type(item)))
+
+    def pop(self):
+        temp = self.d[0]
+        print("temp", temp)
+        self.d.pop(0)
+        return  temp
+
+    def sort(self, reverse=True):
+        print(self.d)
+        self.d = sorted(self.d, key=itemgetter(1), reverse=reverse)
+
+    def insert(self, key, val):
+        keys = [a[0] for a in self.d]
+        idx = keys.index(key)
+        self.d.pop(idx)
+        keys = [a[0] for a in self.d]
+        idx = bisect.bisect(keys, key)
+        self.d.insert(idx, (key, val))
+
 
 # Todo fix this
 class LazyGreedy (Optimisation):
@@ -94,7 +155,7 @@ class LazyGreedy (Optimisation):
         This implementation is equivalent to lazier than lazy greedy.
     """
 
-    def __init__(self, X, Y, batch_size):
+    def __init__(self, X, Y, fwd_batch_size, batch_size):
         """
         -------------------------------------------------
         :param X: Set of Data points
@@ -103,9 +164,11 @@ class LazyGreedy (Optimisation):
         :param fwd_batch: The set of sampled points
         -------------------------------------------------
         """
-        self.priority_queue = []
-        super (LazyGreedy, self).__init__ (X, Y, batch_size)
+        self.priority_queue = {}
+        super (LazyGreedy, self).__init__ (X, Y, fwd_batch_size, batch_size)
 
+    def create_priority_queue(self):
+        self.priority_queue = dict (zip (np.arange (0, self.X.shape[0]), [sys.maxsize] * self.X.shape[0]))
 
     def sample(self, model, fnc):
         """
@@ -130,34 +193,38 @@ class LazyGreedy (Optimisation):
         ------------------------------------------------------------------------------------
         :return: set of k data points that maximisize the given function S
         """
-        self.create_fwd_batch ()
-        self.priority_queue = list (
-            zip (list (map (lambda x: fnc (j, model, self. candidate_points,self.sample_points)), self.candidate_points)),
-            self.candidate_points,
-            [0] * len (self.candidate_points))
+        if (len(self.priority_queue) == 0):
+            self.create_priority_queue()
 
-        heapq.heapify (self.priority_queue)
         temp = []
         while(len(temp)<self.cardinality):
-            x = heapq.heappop (self.priority_queue)
-            if x[2] == 0:
-                alpha = fnc (x[1], model, self.sample_points)
+            self.create_fwd_batch ()
+            mini_dict = dictionary_heap()
+            for i in self.candidate_points:
+                mini_dict.update((i, self.priority_queue[i]))
 
-            if x[2] == 1 or alpha > max (self.priority_queue, key=itemgetter (0))[0]:
-                self.sample_points.append (x[1])
-                temp.append(x[1])
-                for i in self.priority_queue:
-                    i = list (i)
-                    i[2] = 0
-                    i = tuple (i)
-            else:
-                heapq.heappush (self.priority_queue, (fnc (x[1], model, self.sample_points), x[1], 1))
+            mini_dict.sort(reverse=True)
+            while(1 == 1):
+                # Sample the highest key
+                k = mini_dict.pop()[0]
+                # Freshen it up.
+                alpha = fnc(k, model, self.candidate_points, self.sample_points)
+                # If alpha is greater than everbody else in the sub-sampled set sample it and break.
+                if alpha > mini_dict.max():
+                    self.sample_points.append (k)
+                    temp.append(k)
+                    break
+                else:
+                    mini_dict.update((k, alpha))
+            # Update the priority queue
+            for k,v in mini_dict:
+                self.priority_queue[k] = v
         return temp
 
 
 class ProbGreedy (Optimisation):
 
-    def __init__(self, X, Y, batch_size):
+    def __init__(self, X, Y, fwd_batch_size, batch_size):
         """
         -------------------------------------------------
         :param X: Set of Data points
@@ -167,7 +234,7 @@ class ProbGreedy (Optimisation):
         -------------------------------------------------
         """
 
-        super (ProbGreedy, self).__init__  (X, Y, batch_size)
+        super (ProbGreedy, self).__init__  (X, Y, fwd_batch_size, batch_size)
 
     def sample(self, model, fnc):
         """
@@ -183,15 +250,14 @@ class ProbGreedy (Optimisation):
         """
         temp = []
 
-        for i in range (0, self.cardinality):
+        for i in range (0, self.k):
             self.create_fwd_batch()
             prob_candidate_points = np.zeros(self.candidate_points.shape)
             for k, v in enumerate (self.candidate_points):
                 prob_candidate_points[k] = fnc (v, model, self.candidate_points, self.sample_points)
 
             prob_candidate_points = self.softmax (prob_candidate_points)
-            t = np.random.choice (self.candidate_points, size=1, p=prob_candidate_points)
+            t = np.random.choice (self.candidate_points, size=self.cardinality // self.k, p=prob_candidate_points)
             temp.extend(t)
             self.sample_points.extend(t)
-        print(temp)
         return temp

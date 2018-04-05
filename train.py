@@ -14,9 +14,9 @@ def softmax(x):
 
 
 def train_model(model, x_train, y_train, x_test, y_test,
-                dataset, batch_size, fwd_batch_size, loss_function,
+                dataset, batch_size, approx_factor, fwd_batch_size, loss_function,
                 num_epoch, num_exp, sampler, optimizer,
-                steps_per_epoch, folder):
+                steps_per_epoch, kernel, folder):
     """
 
     :param model: Neural Network Model
@@ -47,22 +47,22 @@ def train_model(model, x_train, y_train, x_test, y_test,
         model.fit (x_train[temp_idx], y_train[temp_idx], batch_size=batch_size, epochs=burn_in_epoch)
 
         if optimizer == "Greedy":
-            optimizer = Greedy (x_train, y_train, fwd_batch_size, batch_size)
+            optimizer = Greedy (x_train, y_train, fwd_batch_size, batch_size, approx_factor)
         elif optimizer == "LazyGreedy":
-            optimizer = LazyGreedy (x_train, y_train, fwd_batch_size, batch_size)
+            optimizer = LazyGreedy (x_train, y_train, fwd_batch_size, batch_size, approx_factor)
         elif optimizer == "ProbGreedy":
-            optimizer = ProbGreedy (x_train, y_train, fwd_batch_size, batch_size)
+            optimizer = ProbGreedy (x_train, y_train, fwd_batch_size, batch_size, approx_factor)
 
         if sampler == 'ssgd':
-            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function)
+            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
         elif sampler == 'random':
-            sampler = SelectRandom ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function)
+            sampler = SelectRandom ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
         elif sampler == 'loss':
-            sampler = SelectLoss ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function)
+            sampler = SelectLoss ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
         elif sampler == 'entropy':
-            sampler = SelectEntropy ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function)
+            sampler = SelectEntropy ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
         elif sampler == 'flid':
-            sampler = SelectFlid ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function)
+            sampler = SelectFlid ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
 
         # Make selection
         epoch = 0

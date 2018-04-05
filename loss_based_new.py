@@ -2,7 +2,6 @@ from __future__ import division
 from __future__ import print_function
 import sys
 sys.path.append("/Users/kris/Desktop/ijcai2k18/code/")
-print(sys.path)
 from new_code.create_model import *
 from new_code.read_data import *
 from new_code.train import *
@@ -28,6 +27,7 @@ def main():
     parser.add_argument ("--num_epoch", type=int, default=10)
     parser.add_argument ("--steps_per_epoch", type=int, default=None)
     parser.add_argument ("--batch_size", type=int, default=50)
+    parser.add_argument("--approx_factor", type=int, default=1)
     parser.add_argument ("--fwd_batch_size", type=int, default=1024)
     parser.add_argument ("--loss_function", type=str, default="categorical_crossentropy")
     parser.add_argument ("--dataset", type=str, choices=['mnist', 'fmnist', 'cifar10', 'cifar100', 'svnh', 'ptb'])
@@ -41,9 +41,9 @@ def main():
         args.steps_per_epoch = (x_train.shape[0] // args.batch_size)
     model = create_model (x_train.shape[1:], y_train.shape[1], args.loss_function, args.dataset)
     train_model (model, x_train, y_train, x_test, y_test,
-                 args.dataset, args.batch_size, args.fwd_batch_size,
+                 args.dataset, args.batch_size, args.approx_factor, args.fwd_batch_size,
                  args.loss_function, args.num_epoch,
-                 args.num_exp, args.sampler, args.optimizer, args.steps_per_epoch, args.folder)
+                 args.num_exp, args.sampler, args.optimizer, args.steps_per_epoch, args.kernel, args.folder)
 
 if __name__ == "__main__":
     main()

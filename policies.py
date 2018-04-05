@@ -1,11 +1,21 @@
 import numpy as np
 import sys
+import time
 import tensorflow as tf
 import keras.backend as K
 from keras.models import Model
 from new_code.submodular_optimisation import *
 from scipy.stats import entropy
+from scipy.spatial.distance import cosine
+from sklearn.preprocessing import  normalize
 from keras.losses import sparse_categorical_crossentropy
+
+import inspect
+def pv(name):
+    record=inspect.getouterframes(inspect.currentframe())[1]
+    frame=record[0]
+    val=eval(name,frame.f_globals,frame.f_locals)
+    print('{0}: {1}'.format(name, val))
 
 
 class SelectSSGD:
@@ -21,7 +31,7 @@ class SelectSSGD:
     link : http://ieeexplore.ieee.org/document/6912976/
     """
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss, kernel):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -37,11 +47,14 @@ class SelectSSGD:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
-        self.entropy = None
+        self.entropy = {}
+        self.features = {}
         self.optimizer = optimizer
+        self.kernel = kernel
+        self.max_entropy = 1
 
 
-    def compute_entropy(self, model, candidate_points):
+    def compute_entropy(self, model, candidate_points, sampled_points):
         """
         -------------------------------------------------------------------------------
         Computes the entropy for all of the data points in fwd_batch.
@@ -49,18 +62,32 @@ class SelectSSGD:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.entropy = dict(zip(candidate_points, map(lambda  x: entropy(x),
-                                              model.predict_proba (self.X[candidate_points]))))
+        start_time = time.time()
+        intermediate_layer_model = Model (inputs=model.input,
+                                          outputs=[model.get_layer ("prob").output,
+                                                   model.get_layer("features").output])
+        if self.kernel == "l2":
+            idx = np.hstack((candidate_points, sampled_points))
+            idx = idx.astype("int")
+            prob, feat= intermediate_layer_model.predict (self.X[idx])
+            self.entropy = dict (zip (idx, list(map(lambda i:entropy(i), prob))))
+            self.features = dict (zip (idx, list(feat)))
+        else:
+            prob, feat = intermediate_layer_model.predict (self.X[candidate_points])
+            self.entropy = dict (zip (candidate_points, entropy(prob)))
+
+        end_time = time.time()
+        self.max_entropy = max(self.entropy.values())
+        tot = int(end_time - start_time)
+        print("{a} min {b} sec".format(a=tot // 60, b=tot%60))
 
     def ent(self, idx, model, candidate_points):
         """
         :return: The entropy of data point index by idx in the original data.
         """
-        if self.entropy == None:
-            self.compute_entropy (model, candidate_points)
-        return self.entropy[idx]
+        return self.entropy[idx] / float(self.max_entropy)
 
-    def distance(self, idx, candidate_points, sampled_points, kernel="fro"):
+    def distance(self, idx, candidate_points, sampled_points):
         """
         -------------------------------------------------------------------------------
         Compute the distance term for no duplicates.
@@ -76,13 +103,15 @@ class SelectSSGD:
         :return: minimum distance of the candidate from sampled points
         """
         min_dist = 1000000
-        if kernel == "l2":
+        if self.kernel == "l2":
             if len(sampled_points) == 0:
                 return 0
             for i in sampled_points:
-                min_dist = min (np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2)), min_dist)
+                a = self.features[idx]/np.linalg.norm(self.features[idx])
+                b = self.features[i]/np.linalg.norm(self.features[i])
+                min_dist = min (cosine(a, b), min_dist)
 
-        if kernel == "fro":
+        if self.kernel == "fro":
             if len(sampled_points) == 0:
                 return 0
             for i in sampled_points:
@@ -91,7 +120,7 @@ class SelectSSGD:
 
         return min_dist
 
-    def diversity(self, idx, candidate_points, sampled_points, kernel="fro"):
+    def diversity(self, idx, candidate_points, sampled_points):
         """
         --------------------------------------------------------------------------------
         Compute the diversity term of el based on the sampled points.
@@ -102,15 +131,17 @@ class SelectSSGD:
         :return: average kernelized distance of the candidate from sampled points
 
         """
-        if kernel == "l2":
+        if self.kernel == "l2":
             dist = 0
             if len(sampled_points) == 0:
                 return dist
             for i in sampled_points:
-                dist += np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2))
+                a = self.features[idx] / np.linalg.norm (self.features[idx])
+                b = self.features[i] / np.linalg.norm (self.features[i])
+                dist += cosine(a, b)
             dist / len (sampled_points)
 
-        if kernel == "fro":
+        if self.kernel == "fro":
             dist = 0
             if len(sampled_points) == 0:
                 return dist
@@ -120,7 +151,7 @@ class SelectSSGD:
 
         return dist
 
-    def marginal_gain(self, idx, model, candidate_points, data_points):
+    def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
         -------------------------------------------------------------------
         Computes the SSGD value of the given data point indexed by idx
@@ -129,11 +160,14 @@ class SelectSSGD:
         :param idx: data point for which to calculate the value
         :return:
         """
-        kernel = "fro"
+        alpha, beta, gamma = 0.4, 1, 1
+        if compute_entropy == 1:
+            self.compute_entropy(model, candidate_points, sampled_points)
         ent = self.ent(idx, model, candidate_points)
-        diversity = self.diversity (idx, candidate_points, data_points, kernel)
-        dist = self.distance (idx, candidate_points, data_points, kernel)
-        return ent + diversity + dist
+        diversity = self.diversity (idx, candidate_points, sampled_points)
+        dist = self.distance (idx, candidate_points, sampled_points)
+        # pv("alpha*ent, beta*diversity, gamma*dist")
+        return alpha * ent + beta * diversity + gamma * dist
 
 
     def sample(self, model):
@@ -147,7 +181,6 @@ class SelectSSGD:
         -------------------------------------------------------------------
         :return Sampled data points of cardianlity k
         """
-        self.entropy = None
         return self.optimizer.sample (model, self.marginal_gain)
 
 class SelectEntropy:
