@@ -224,7 +224,7 @@ class LazyGreedy (Optimisation):
 
 class ProbGreedy (Optimisation):
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, approx_factor):
         """
         -------------------------------------------------
         :param X: Set of Data points
@@ -234,7 +234,7 @@ class ProbGreedy (Optimisation):
         -------------------------------------------------
         """
 
-        super (ProbGreedy, self).__init__  (X, Y, fwd_batch_size, batch_size)
+        super (ProbGreedy, self).__init__  (X, Y, fwd_batch_size, batch_size, approx_factor)
 
     def sample(self, model, fnc):
         """
@@ -252,9 +252,11 @@ class ProbGreedy (Optimisation):
 
         for i in range (0, self.k):
             self.create_fwd_batch()
+            compute_entropy = 1
             prob_candidate_points = np.zeros(self.candidate_points.shape)
             for k, v in enumerate (self.candidate_points):
-                prob_candidate_points[k] = fnc (v, model, self.candidate_points, self.sample_points)
+                prob_candidate_points[k] = fnc (v, model, self.candidate_points, self.sample_points, compute_entropy)
+                compute_entropy = 0
 
             prob_candidate_points = self.softmax (prob_candidate_points)
             t = np.random.choice (self.candidate_points, size=self.cardinality // self.k, p=prob_candidate_points)
