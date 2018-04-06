@@ -55,14 +55,19 @@ def train_model(model, x_train, y_train, x_test, y_test,
 
         if sampler == 'ssgd':
             sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
+            reset = 1
         elif sampler == 'random':
             sampler = SelectRandom ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
+            reset = 0
         elif sampler == 'loss':
             sampler = SelectLoss ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
+            reset = 0
         elif sampler == 'entropy':
             sampler = SelectEntropy ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
+            reset = 1
         elif sampler == 'flid':
             sampler = SelectFlid ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
+            reset = 1
 
         # Make selection
         epoch = 0
@@ -75,6 +80,9 @@ def train_model(model, x_train, y_train, x_test, y_test,
         if dataset == "cifar10":
             while epoch < num_epoch:
                 # Importance sampling is done here
+                # Make sample points = nil
+                print ("---------------------------------")
+                sampler.optimizer.sample_points = []
                 for ab in range (steps_per_epoch):
                     idxs = sampler.sample (model)
                     # Train on the sampled data
@@ -90,9 +98,12 @@ def train_model(model, x_train, y_train, x_test, y_test,
                 epoch += 1
         else:
             while epoch < num_epoch:
+                print("---------------------------------")
+                # Make sample points = nil
+                if reset == 1:
+                    sampler.optimizer.sample_points = []
                 # Importance sampling is done here
                 for ab in range (steps_per_epoch):
-
                     idxs = sampler.sample (model)
                     print("idxs.shape" , len(idxs))
                     # Train on the sampled data

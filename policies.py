@@ -47,7 +47,7 @@ class SelectSSGD:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
-        self.entropy = np.zeros_like(shape=(X.shape[0], 1))
+        self.entropy = np.zeros(shape=(X.shape[0], 1))
         self.features = []
         self.optimizer = optimizer
         self.kernel = kernel
@@ -193,7 +193,7 @@ class SelectEntropy:
     ----------------------------------------------------------------------------------
     """
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss, _):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -211,7 +211,7 @@ class SelectEntropy:
         self.entropy = None
         self.optimizer = optimizer
 
-    def compute_entropy(self, model):
+    def compute_entropy(self, model, candidate_points):
         """
         -------------------------------------------------------------------------------
         Computes the entropy for all of the data points in fwd_batch.
@@ -219,10 +219,10 @@ class SelectEntropy:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        self.entropy = dict(zip(self.candidate_points, map(lambda  x: entropy(x),
-                                              model.predict_proba (self.X[self.candidate_points]))))
+        self.entropy = dict(zip(candidate_points, map(lambda  x: entropy(x),
+                                              model.predict_proba (self.X[candidate_points]))))
 
-    def marginal_gain(self, idx, model, _):
+    def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
         ------------------------------------------------------------
         Computes the entropy of the given data points.
@@ -230,8 +230,8 @@ class SelectEntropy:
         :param idx: Element being added
         :return: Entropy of the item intex by idx
         """
-        if self.entropy == None:
-            self.compute_entropy(model)
+        if compute_entropy == 1:
+            self.compute_entropy(model, candidate_points)
         return self.entropy[idx]
 
     def sample(self, model):
@@ -245,9 +245,7 @@ class SelectEntropy:
         -------------------------------------------------------------------
         :return Sampled data points of cardianlity k
         """
-        self.create_fwd_batch()
-        self.entropy = None
-        return self.optimizer.sample (model, self.marginal_gain, self.candidate_points)
+        return self.optimizer.sample (model, self.marginal_gain)
 
 class SelectFlid:
     """
@@ -406,7 +404,7 @@ class SelectLoss:
         No need of rejection sampling.
     """
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size, _,  loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, _,  loss, kernel):
         """
         :param loss: loss function
         :param x_train: training dataN
@@ -419,7 +417,8 @@ class SelectLoss:
         self.loss = loss
         self.A = tf.placeholder('float', shape=[None, 10])
         self.B = tf.placeholder('float', shape=[None, 10])
-        self.res = K.get_value (tf.nn.softmax_cross_entropy_with_logits (labels=self.A, logits=self.B))
+        self.res = tf.nn.softmax_cross_entropy_with_logits(labels=self.A, logits=self.B)
+        self.fnc = K.function([self.A, self.B], [self.res])
 
     def sample(self, model):
         """
@@ -428,9 +427,8 @@ class SelectLoss:
         """
         idx = np.random.choice (np.arange (0, self.X.shape[0]), size=self.fwd_batch_size, replace=False)
         res = model.predict_proba (self.X[idx])
-        with tf.Session () as sess:
-            sess.run(self.res, feed_dict={self.A: self.Y[idx], self.B: res})
-        res = res / np.sum (res)
+        res = self.fnc([self.Y[idx], res])
+        res = res[0] / np.sum(res[0])
         return np.random.choice (idx,
                                  size=self.batch_size,
                                  replace=False,
@@ -441,7 +439,7 @@ class SelectRandom:
         Class provides selection based on random sampling
     """
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size, _, loss):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, _, loss, kernel):
         """
         :param loss: loss function
         :param x_train: training data
