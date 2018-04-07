@@ -68,33 +68,28 @@ def create_model(input_shape, output_size, loss_function, dataset):
             "activation": "relu",
             "border_mode": "same"
         }
-        model = Sequential ([
-            # conv1
-            Convolution2D (96, 3, 3, input_shape=input_shape),
-            BatchNormalization (),
-            Convolution2D (96, 3, 3),
-            BatchNormalization (),
-            Convolution2D (96, 3, 3, subsample=(2, 2)),
-            BatchNormalization (),
-            Dropout (0.25),
+        model = Sequential ()
+        model.add (Conv2D (32, (3, 3), padding='same',
+                           input_shape=x_train.shape[1:]))
+        model.add (Activation ('relu'))
+        model.add (Conv2D (32, (3, 3)))
+        model.add (Activation ('relu'))
+        model.add (MaxPooling2D (pool_size=(2, 2)))
+        model.add (Dropout (0.25))
 
-            # conv2
-            Convolution2D (192, 3, 3),
-            BatchNormalization (),
-            Convolution2D (192, 3, 3),
-            BatchNormalization (),
-            Convolution2D (192, 3, 3, subsample=(2, 2)),
-            BatchNormalization (),
-            Dropout (0.25),
+        model.add (Conv2D (64, (3, 3), padding='same'))
+        model.add (Activation ('relu'))
+        model.add (Conv2D (64, (3, 3)))
+        model.add (Activation ('relu'))
+        model.add (MaxPooling2D (pool_size=(2, 2)))
+        model.add (Dropout (0.25))
 
-            # conv3
-            Convolution2D (192, 1, 1, name="features"),
-            BatchNormalization (),
-            Dropout (0.25),
-            Convolution2D (output_size, 1, 1),
-            GlobalAveragePooling2D (),
-            Activation ("softmax", name="prob")
-        ])
+        model.add (Flatten ())
+        model.add (Dense (512), name="features")
+        model.add (Activation ('relu'))
+        model.add (Dropout (0.5))
+        model.add (Dense (num_classes))
+        model.add (Activation ('softmax'), name="prob")
 
         model.compile (
             loss="categorical_crossentropy",
