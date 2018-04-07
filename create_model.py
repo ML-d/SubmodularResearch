@@ -70,7 +70,7 @@ def create_model(input_shape, output_size, loss_function, dataset):
         }
         model = Sequential ()
         model.add (Conv2D (32, (3, 3), padding='same',
-                           input_shape=x_train.shape[1:]))
+                           input_shape=input_shape))
         model.add (Activation ('relu'))
         model.add (Conv2D (32, (3, 3)))
         model.add (Activation ('relu'))
@@ -88,7 +88,7 @@ def create_model(input_shape, output_size, loss_function, dataset):
         model.add (Dense (512), name="features")
         model.add (Activation ('relu'))
         model.add (Dropout (0.5))
-        model.add (Dense (num_classes))
+        model.add (Dense (output_size))
         model.add (Activation ('softmax'), name="prob")
 
         model.compile (
