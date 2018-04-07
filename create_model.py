@@ -68,28 +68,29 @@ def create_model(input_shape, output_size, loss_function, dataset):
             "activation": "relu",
             "border_mode": "same"
         }
-        model = Sequential ()
-        model.add (Conv2D (32, (3, 3), padding='same',
-                           input_shape=input_shape))
-        model.add (Activation ('relu'))
-        model.add (Conv2D (32, (3, 3)))
-        model.add (Activation ('relu'))
-        model.add (MaxPooling2D (pool_size=(2, 2)))
-        model.add (Dropout (0.25))
+        model = Sequential ([
+        Conv2D (32, (3, 3), padding='same',
+                           input_shape=input_shape),
+        Activation ('relu'),
+        Conv2D (32, (3, 3)),
+        Activation ('relu'),
+        MaxPooling2D (pool_size=(2, 2)),
+        Dropout (0.25),
 
-        model.add (Conv2D (64, (3, 3), padding='same'))
-        model.add (Activation ('relu'))
-        model.add (Conv2D (64, (3, 3)))
-        model.add (Activation ('relu'))
-        model.add (MaxPooling2D (pool_size=(2, 2)))
-        model.add (Dropout (0.25))
+        Conv2D (64, (3, 3), padding='same'),
+        Activation ('relu'),
+        Conv2D (64, (3, 3)),
+        Activation ('relu'),
+        MaxPooling2D (pool_size=(2, 2)),
+        Dropout (0.25),
 
-        model.add (Flatten ())
-        model.add (Dense (512), name="features")
-        model.add (Activation ('relu'))
-        model.add (Dropout (0.5))
-        model.add (Dense (output_size))
-        model.add (Activation ('softmax'), name="prob")
+        Flatten (),
+        Dense (512, name="features"),
+        Activation ('relu'),
+        Dropout (0.5),
+        Dense (output_size),
+        Activation ('softmax', name="prob")
+        ])
 
         model.compile (
             loss="categorical_crossentropy",
