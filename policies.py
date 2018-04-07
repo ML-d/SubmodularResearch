@@ -136,13 +136,15 @@ class SelectSSGD:
             else:
                 return (self.sum_distance[idx], self.min_distance[idx])
 
-        else:
+        elif self.kernel == "fro":
             if len(sampled_points) == 0:
                 return 0
+            temp = []
             for i in sampled_points:
-                min_dist = min (np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2), "fro"),
-                                min_dist)
-            return (min_dist, 0)
+                temp.extend(np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2), "fro"))
+                min_dist = min (temp)
+                avg_dist = np.sum(temp) / len(temp)
+            return (avg_dist, min_dist)
 
     def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
