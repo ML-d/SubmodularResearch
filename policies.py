@@ -54,6 +54,19 @@ class SelectSSGD:
         self.max_entropy = 1
         self.sum_distance = 0
         self.min_distance = 0
+        self.feat_dist = None
+        self.fro_min = np.zeros((self.X.shape[0]))
+        self.fro_mean = np.zeros((self.X.shape[0]))
+
+    def compute_feat_distance(self, model, candidate_points, sampled_points):
+        sampled = np.squeeze(self.X[sampled_points], axis=3)
+        pv("sampled.shape")
+        for i in candidate_points:
+            t = np.squeeze (self.X[i], axis=2)
+            t = np.repeat(t[np.newaxis, :,:], len(sampled_points), axis=0)
+            dist = np.linalg.norm(sampled - t, "fro", (1, 2))
+            self.fro_min[i] = np.min(dist)
+            self.fro_mean[i] = np.mean(dist)
 
 
     def compute_entropy(self, model, candidate_points, sampled_points):
@@ -68,19 +81,16 @@ class SelectSSGD:
         intermediate_layer_model = Model (inputs=model.input,
                                           outputs=[model.get_layer ("prob").output,
                                                    model.get_layer("features").output])
-        if self.kernel == "l2":
-            idx = np.hstack((candidate_points, sampled_points))
-            idx = idx.astype("int")
-            prob, feat= intermediate_layer_model.predict (self.X[idx])
-            ent = np.array([entropy(i) for i in prob]).reshape((len(idx), 1))
-            if any(np.isnan(ent)) or any(np.isinf(ent)):
-                raise("Error")
-            self.entropy[idx] = ent
-            self.features = np.empty(shape=((self.X.shape[0], feat.shape[1])))
-            self.features[idx] = feat
-        else:
-            prob, feat = intermediate_layer_model.predict (self.X[candidate_points])
-            self.entropy = dict (zip (candidate_points, entropy(prob)))
+
+        idx = np.hstack((candidate_points, sampled_points))
+        idx = idx.astype("int")
+        prob, feat= intermediate_layer_model.predict (self.X[idx])
+        ent = np.array([entropy(i) for i in prob]).reshape((len(idx), 1))
+        if any(np.isnan(ent)) or any(np.isinf(ent)):
+            raise("Error")
+        self.entropy[idx] = ent
+        self.features = np.empty(shape=((self.X.shape[0], feat.shape[1])))
+        self.features[idx] = feat
 
         end_time = time.time()
         self.entropy = normalize(self.entropy, axis=0)
@@ -138,13 +148,8 @@ class SelectSSGD:
 
         elif self.kernel == "fro":
             if len(sampled_points) == 0:
-                return 0
-            temp = []
-            for i in sampled_points:
-                temp.extend(np.linalg.norm (np.squeeze(self.X[idx], 2) - np.squeeze(self.X[i], 2), "fro"))
-                min_dist = min (temp)
-                avg_dist = np.sum(temp) / len(temp)
-            return (avg_dist, min_dist)
+                return (0, 0)
+            return (self.fro_mean[idx], self.fro_min[idx])
 
     def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
@@ -155,11 +160,13 @@ class SelectSSGD:
         :param idx: data point for which to calculate the value
         :return:
         """
-        alpha, beta, gamma = 0.4, 1, 1
-        if compute_entropy == 1:
+        alpha, beta, gamma = 1, 1, 1
+        if compute_entropy == 1 :
             self.compute_entropy(model, candidate_points, sampled_points)
-        if compute_entropy == 1 and len(sampled_points) > 0:
+        if compute_entropy == 1 and len(sampled_points) > 0 and self.kernel == "l2":
             self.compute_distance(model, candidate_points, sampled_points)
+        elif compute_entropy == 1 and len(sampled_points) > 0 and self.kernel == "fro":
+            self.compute_feat_distance(model,candidate_points, sampled_points)
         ent = self.ent(idx, model, candidate_points)
         # diversity = self.diversity (idx, candidate_points, sampled_points)
         # this computes both distance and diversity
