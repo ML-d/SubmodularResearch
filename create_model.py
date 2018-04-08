@@ -155,11 +155,11 @@ def create_model(input_shape, output_size, loss_function, dataset):
         model.add (Dropout (0.25))
 
         model.add (Flatten ())
-        model.add (Dense (1024), name="features")
+        model.add (Dense (1024, name="features"))
         model.add (Activation ('relu'))
         model.add (Dropout (0.5))
         model.add (Dense (num_classes))
-        model.add (Activation ('softmax'), name="prob")
+        model.add (Activation ('softmax', name="prob"))
 
         # initiate RMSprop optimizer
         opt = keras.optimizers.RMSprop ()

@@ -35,10 +35,10 @@ def read_data(dataset):
     elif (dataset == "cifar100"):
         (x_train, y_train), (x_test, y_test) = cifar100.load_data ()
     elif (dataset == "svnh"):
-        data = sio.loadmat ('./svnh/train_32x32.mat')
+        data = sio.loadmat ('../svnh/train_32x32.mat')
         x_train, y_train = np.transpose (data['X'], (3, 0, 1, 2)), data['y']
         y_train[np.where (y_train == 10)] = 1
-        data = sio.loadmat ('./svnh/test_32x32.mat')
+        data = sio.loadmat ('../svnh/test_32x32.mat')
         x_test, y_test = np.transpose (data['X'], (3, 0, 1, 2)), data['y']
         y_test[np.where (y_test == 10)] = 1
 
