@@ -54,20 +54,30 @@ class SelectSSGD:
         self.max_entropy = 1
         self.sum_distance = 0
         self.min_distance = 0
+        self.compute_once = None
         self.feat_dist = None
-        self.fro_min = np.zeros((self.X.shape[0]))
-        self.fro_mean = np.zeros((self.X.shape[0]))
+        self.fro_min = np.zeros((self.X.shape[0], self.X.shape[0]))
+        self.fro_mean = np.zeros((self.X.shape[0], self.X.shape[0]))
+
+
+    def compute_once_distance(self):
+        pv("self.X.shape")
+        sampled = self.X / 255.0
+        sampled = np.squeeze(sampled, axis=3)
+        dist = np.zeros((self.X.shape[0], self.X.shape[0]))
+        pv("sampled.shape")
+        for i in range(0, 10):
+            t = sampled[i]
+            t = np.repeat(t[np.newaxis, :,:], self.X.shape[0], axis=0)
+            dist[i] = np.linalg.norm(t-sampled, "fro", (1, 2))
+        return dist
 
     def compute_feat_distance(self, model, candidate_points, sampled_points):
-        sampled = np.squeeze(self.X[sampled_points], axis=3)
-        pv("sampled.shape")
-        for i in candidate_points:
-            t = np.squeeze (self.X[i], axis=2)
-            t = np.repeat(t[np.newaxis, :,:], len(sampled_points), axis=0)
-            dist = np.linalg.norm(sampled - t, "fro", (1, 2))
-            self.fro_min[i] = np.min(dist)
-            self.fro_mean[i] = np.mean(dist)
-
+        if self.compute_once == None:
+            dist = self.compute_once_distance()
+        print(dist.shape)
+        self.fro_min = np.min(dist[candidate_points][sampled_points])
+        self.fro_mean = np.mean(dist[candidate_points][sampled_points])
 
     def compute_entropy(self, model, candidate_points, sampled_points):
         """
