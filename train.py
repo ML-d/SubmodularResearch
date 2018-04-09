@@ -82,7 +82,8 @@ def train_model(model, x_train, y_train, x_test, y_test,
                 # Importance sampling is done here
                 # Make sample points = nil
                 print ("---------------------------------")
-                sampler.optimizer.sample_points = []
+                if sampler == "SSGD" or sampler == "entropy":
+                    sampler.optimizer.sample_points = []
                 for ab in range (steps_per_epoch):
                     idxs = sampler.sample (model)
                     # Train on the sampled data

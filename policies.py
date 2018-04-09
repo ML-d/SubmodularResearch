@@ -60,13 +60,15 @@ class SelectSSGD:
         self.fro_mean = np.zeros((self.X.shape[0], self.X.shape[0]))
 
 
+
     def compute_once_distance(self):
         pv("self.X.shape")
         sampled = self.X / 255.0
+        sampled = np.mean(self.X, axis=self.X.shape()[-1], keepdims=True)
         sampled = np.squeeze(sampled, axis=3)
         dist = np.zeros((self.X.shape[0], self.X.shape[0]))
         pv("sampled.shape")
-        for i in range(0, 10):
+        for i in range(0, self.X.shape[0]):
             t = sampled[i]
             t = np.repeat(t[np.newaxis, :,:], self.X.shape[0], axis=0)
             dist[i] = np.linalg.norm(t-sampled, "fro", (1, 2))
