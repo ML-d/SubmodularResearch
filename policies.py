@@ -125,7 +125,7 @@ class SelectSSGD:
         else:
 
             self.min_distance[candidate_points] = np.min (self.dist_matrix[candidate_points][:, sampled_points])
-            self.sum_distance[candidate_points] = np.mean (self.sum_distancedist_matrix[candidate_points][:, sampled_points])
+            self.sum_distance[candidate_points] = np.mean (self.dist_matrix[candidate_points][:, sampled_points])
 
     def ent(self, idx, model, candidate_points):
         """
