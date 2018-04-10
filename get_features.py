@@ -16,9 +16,11 @@ num_classes = 10
 dataset = args.dataset
 x_train, y_train, x_test, y_test = read_data.read_data(dataset)
 print(x_train.shape)
+
 model = create_model.create_model(x_train.shape[1:], num_classes, "categorical_crossentropy", "mnist")
-model.fit(x_train, y_train, batch_size = 256, shuffle=True)
-start_time = time.time()
+for i in range(0, 10):
+    model.fit(x_train, y_train, batch_size = 512, shuffle=True)
+
 intermediate_layer_model = Model (inputs=model.input, outputs=[model.get_layer ("prob").output,
                                            model.get_layer("features").output])
 prob, features = intermediate_layer_model.predict(x_train)
