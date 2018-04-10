@@ -26,7 +26,7 @@ class Optimisation (ABC):
         self.candidate_points = []
         self.k = approx_factor
 
-    def softmax(self, x, t=0.01):
+    def softmax(self, x, t=1):
         """
             Compute softmax values for each sets of scores in x.
             Variables

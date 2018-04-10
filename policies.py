@@ -17,6 +17,14 @@ def pv(name):
     val=eval(name,frame.f_globals,frame.f_locals)
     print('{0}: {1}'.format(name, val))
 
+def read_distances(dataset, kernel):
+    if kernel == "l2":
+        dist_matrix = np.load("./distance/" + str(dataset) + "_l2.npy")
+    elif kernel == "cosine":
+        dist_matrix = np.load("./distance/" + str(datqset) + "_cosine.npy")
+
+    return dist_matrix
+
 
 class SelectSSGD:
     """
@@ -31,7 +39,7 @@ class SelectSSGD:
     link : http://ieeexplore.ieee.org/document/6912976/
     """
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss, kernel):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss, kernel, **kwargs):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -58,28 +66,13 @@ class SelectSSGD:
         self.feat_dist = None
         self.fro_min = np.zeros((self.X.shape[0], self.X.shape[0]))
         self.fro_mean = np.zeros((self.X.shape[0], self.X.shape[0]))
-
-
+        self.dist_matrix = None
+        self.dataset = kwargs.pop("dataset")
+        self.compute_once == kwargs.pop("compute_once")
 
     def compute_once_distance(self):
-        pv("self.X.shape")
-        sampled = self.X / 255.0
-        sampled = np.mean(self.X, axis=self.X.shape()[-1], keepdims=True)
-        sampled = np.squeeze(sampled, axis=3)
-        dist = np.zeros((self.X.shape[0], self.X.shape[0]))
-        pv("sampled.shape")
-        for i in range(0, self.X.shape[0]):
-            t = sampled[i]
-            t = np.repeat(t[np.newaxis, :,:], self.X.shape[0], axis=0)
-            dist[i] = np.linalg.norm(t-sampled, "fro", (1, 2))
-        return dist
+        self.dist_matrix = read_distances(self.dataset, self.kernel)
 
-    def compute_feat_distance(self, model, candidate_points, sampled_points):
-        if self.compute_once == None:
-            dist = self.compute_once_distance()
-        print(dist.shape)
-        self.fro_min = np.min(dist[candidate_points][sampled_points])
-        self.fro_mean = np.mean(dist[candidate_points][sampled_points])
 
     def compute_entropy(self, model, candidate_points, sampled_points):
         """
@@ -110,23 +103,27 @@ class SelectSSGD:
         print("Forward Pass {a} min {b} sec".format(a=tot // 60, b=tot%60))
 
     def compute_distance(self, model, candidate_points, sampled_points):
-        start_time = time.time ()
-        self.sum_distance = np.zeros((self.X.shape[0], 1))
-        self.min_distance = np.zeros_like(self.sum_distance)
-        idx = np.hstack ((candidate_points, sampled_points))
-        self.features = normalize(self.features, axis=1)
-        feat_candidates = self.features[candidate_points]
-        feat_sample = self.features[sampled_points]
-        feat_mat = np.dot(feat_candidates, np.transpose(feat_sample))
-        feat_mat = np.ones_like(feat_mat) - feat_mat
-        pv("feat_mat.shape")
-        self.sum_distance[candidate_points] = np.expand_dims(feat_mat.sum(axis=1) / feat_mat.shape[1], axis=1)
-        pv("self.sum_distance.shape")
-        self.min_distance[candidate_points] = np.expand_dims(np.min(feat_mat, axis=1), axis=1)
-        pv("self.sum_distance.shape")
-        end_time = time.time()
-        tot = int (end_time - start_time)
-        print ("Computation time {a} min {b} sec".format (a=tot // 60, b=tot % 60))
+        self.sum_distance = np.zeros ((self.X.shape[0], 1))
+        self.min_distance = np.zeros_like (self.sum_distance)
+        if self.compute_once:
+            start_time = time.time ()
+            idx = np.hstack ((candidate_points, sampled_points))
+            self.features = normalize(self.features, axis=1)
+            feat_candidates = self.features[candidate_points]
+            feat_sample = self.features[sampled_points]
+            feat_mat = np.dot(feat_candidates, np.transpose(feat_sample))
+            feat_mat = np.ones_like(feat_mat) - feat_mat
+            pv("feat_mat.shape")
+            self.sum_distance[candidate_points] = np.expand_dims(feat_mat.sum(axis=1) / feat_mat.shape[1], axis=1)
+            pv("self.sum_distance.shape")
+            self.min_distance[candidate_points] = np.expand_dims(np.min(feat_mat, axis=1), axis=1)
+            pv("self.sum_distance.shape")
+            end_time = time.time()
+            tot = int (end_time - start_time)
+            print ("Computation time {a} min {b} sec".format (a=tot // 60, b=tot % 60))
+        else:
+            self.min_distance[candidate_points] = np.min (self.dist_matrix[candidate_points][sampled_points])
+            self.sum_distance[candidate_points] = np.mean (self.sum_distancedist_matrix[candidate_points][sampled_points])
 
     def ent(self, idx, model, candidate_points):
         """
@@ -151,17 +148,16 @@ class SelectSSGD:
         :param kernel: kernel function for computing distance
         :return: minimum distance of the candidate from sampled points
         """
-        min_dist = 1000000
-        if self.kernel == "l2":
+        if self.kernel == "cosine":
             if len(sampled_points) == 0:
                 return (0, 0)
             else:
                 return (self.sum_distance[idx], self.min_distance[idx])
 
-        elif self.kernel == "fro":
+        elif self.kernel == "l2":
             if len(sampled_points) == 0:
                 return (0, 0)
-            return (self.fro_mean[idx], self.fro_min[idx])
+            return (self.sum_distance[idx], self.min_distance[idx])
 
     def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
@@ -175,10 +171,9 @@ class SelectSSGD:
         alpha, beta, gamma = 1, 1, 1
         if compute_entropy == 1 :
             self.compute_entropy(model, candidate_points, sampled_points)
-        if compute_entropy == 1 and len(sampled_points) > 0 and self.kernel == "l2":
+        if compute_entropy == 1 and len(sampled_points) > 0 and self.kernel == "l2" or self.kernel == "cosine":
             self.compute_distance(model, candidate_points, sampled_points)
-        elif compute_entropy == 1 and len(sampled_points) > 0 and self.kernel == "fro":
-            self.compute_feat_distance(model,candidate_points, sampled_points)
+
         ent = self.ent(idx, model, candidate_points)
         # diversity = self.diversity (idx, candidate_points, sampled_points)
         # this computes both distance and diversity
