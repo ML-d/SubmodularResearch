@@ -31,7 +31,7 @@ def main():
     parser.add_argument ("--fwd_batch_size", type=int, default=1024)
     parser.add_argument ("--loss_function", type=str, default="categorical_crossentropy")
     parser.add_argument ("--dataset", type=str, choices=['mnist', 'fmnist', 'cifar10', 'cifar100', 'svnh', 'ptb'])
-    parser.add_argument ("--kernel", type=str, choices=["l2", "fro"])
+    parser.add_argument ("--kernel", type=str, choices=["l2", "fro", "cosine"])
     parser.add_argument ("--folder", type=str, default="./mnist/random/")
     parser.add_argument ("--verbose", type=bool, default=True)
 
