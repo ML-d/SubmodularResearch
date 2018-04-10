@@ -69,6 +69,7 @@ class SelectSSGD:
         self.dist_matrix = None
         self.dataset = kwargs.pop("dataset")
         self.compute_once == kwargs.pop("compute_once")
+        self.compute_once_distance()
 
     def compute_once_distance(self):
         self.dist_matrix = read_distances(self.dataset, self.kernel)
@@ -122,8 +123,9 @@ class SelectSSGD:
             tot = int (end_time - start_time)
             print ("Computation time {a} min {b} sec".format (a=tot // 60, b=tot % 60))
         else:
-            self.min_distance[candidate_points] = np.min (self.dist_matrix[candidate_points][sampled_points])
-            self.sum_distance[candidate_points] = np.mean (self.sum_distancedist_matrix[candidate_points][sampled_points])
+
+            self.min_distance[candidate_points] = np.min (self.dist_matrix[candidate_points][:, sampled_points])
+            self.sum_distance[candidate_points] = np.mean (self.sum_distancedist_matrix[candidate_points][:, sampled_points])
 
     def ent(self, idx, model, candidate_points):
         """
