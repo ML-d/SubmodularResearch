@@ -54,7 +54,7 @@ def train_model(model, x_train, y_train, x_test, y_test,
             optimizer = ProbGreedy (x_train, y_train, fwd_batch_size, batch_size, approx_factor)
 
         if sampler == 'ssgd':
-            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel, dataset=dataset, compute_once=1)
+            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel, dataset, 1)
             reset = 1
         elif sampler == 'random':
             sampler = SelectRandom ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)

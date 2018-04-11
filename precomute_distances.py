@@ -2,11 +2,12 @@ import keras
 import numpy as np
 import keras.backend as K
 from sklearn.preprocessing import normalize
+from sklearn.metrics.pairwise import euclidean_distances
 import argparse
 
 parser = argparse.ArgumentParser(add_help=True)
-parser.add_argument("--dataset", str)
-parser.add_argument("--distance", str, choices=["l2", "cosine"])
+parser.add_argument("--dataset", type = str, default="mnist")
+parser.add_argument("--distance", type = str, choices=["l2", "cosine"])
 args = parser.parse_args()
 dataset = args.dataset
 file_name = dataset+"_feat.npy"

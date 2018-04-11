@@ -21,7 +21,7 @@ def read_distances(dataset, kernel):
     if kernel == "l2":
         dist_matrix = np.load("./distance/" + str(dataset) + "_l2.npy")
     elif kernel == "cosine":
-        dist_matrix = np.load("./distance/" + str(datqset) + "_cosine.npy")
+        dist_matrix = np.load("./distance/" + str(dataset) + "_cosine.npy")
 
     return dist_matrix
 
@@ -39,7 +39,7 @@ class SelectSSGD:
     link : http://ieeexplore.ieee.org/document/6912976/
     """
 
-    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss, kernel, **kwargs):
+    def __init__(self, X, Y, fwd_batch_size, batch_size, optimizer, loss, kernel, dataset, compute_once):
         """
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
@@ -62,13 +62,12 @@ class SelectSSGD:
         self.max_entropy = 1
         self.sum_distance = 0
         self.min_distance = 0
-        self.compute_once = None
         self.feat_dist = None
         self.fro_min = np.zeros((self.X.shape[0], self.X.shape[0]))
         self.fro_mean = np.zeros((self.X.shape[0], self.X.shape[0]))
         self.dist_matrix = None
-        self.dataset = kwargs.pop("dataset")
-        self.compute_once == kwargs.pop("compute_once")
+        self.dataset = dataset
+        self.compute_once = compute_once
         self.compute_once_distance()
 
     def compute_once_distance(self):
@@ -106,7 +105,7 @@ class SelectSSGD:
     def compute_distance(self, model, candidate_points, sampled_points):
         self.sum_distance = np.zeros ((self.X.shape[0], 1))
         self.min_distance = np.zeros_like (self.sum_distance)
-        if self.compute_once:
+        if not self.compute_once:
             start_time = time.time ()
             idx = np.hstack ((candidate_points, sampled_points))
             self.features = normalize(self.features, axis=1)
@@ -123,7 +122,8 @@ class SelectSSGD:
             tot = int (end_time - start_time)
             print ("Computation time {a} min {b} sec".format (a=tot // 60, b=tot % 60))
         else:
-
+            pv ("len(sampled_points)")
+            pv ("self.kernel")
             self.min_distance[candidate_points] = np.min (self.dist_matrix[candidate_points][:, sampled_points])
             self.sum_distance[candidate_points] = np.mean (self.dist_matrix[candidate_points][:, sampled_points])
 
@@ -173,7 +173,7 @@ class SelectSSGD:
         alpha, beta, gamma = 1, 1, 1
         if compute_entropy == 1 :
             self.compute_entropy(model, candidate_points, sampled_points)
-        if compute_entropy == 1 and len(sampled_points) > 0 and self.kernel == "l2" or self.kernel == "cosine":
+        if compute_entropy == 1 and len(sampled_points) > 0 and (self.kernel == "l2" or self.kernel == "cosine"):
             self.compute_distance(model, candidate_points, sampled_points)
 
         ent = self.ent(idx, model, candidate_points)
