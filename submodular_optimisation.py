@@ -45,7 +45,7 @@ class Optimisation (ABC):
         Computes the fwd_batch
         :return: Subsampled data points to make selection from.
         """
-        t = np.arange (0, self.X.shape[0])
+        t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.sample_points)
         self.candidate_points = np.random.choice (t, size= self.fwd_batch_size, replace=False)
         assert (len(self.candidate_points)==self.fwd_batch_size)
 
