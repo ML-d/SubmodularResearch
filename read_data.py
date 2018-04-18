@@ -10,8 +10,6 @@ from keras.datasets import cifar100
 from keras.datasets import fashion_mnist
 from keras.datasets import mnist
 
-
-
 def read_data(dataset):
     """
     Download the data
