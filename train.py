@@ -98,7 +98,10 @@ def train_model(model, x_train, y_train, x_test, y_test,
                 print("---------------------------------")
                 # Importance sampling is done here
                 # After Every epoch sample_points are reinitialized
-                optimizer.sample_points = []
+                if sampler == "random" or sampler == "loss":
+                    sampler.sample_points = []
+                else:
+                    optimizer.sample_points = []
                 for ab in range (steps_per_epoch):
                     idxs = sampler.sample (model)
                     print("idxs.shape" , len(idxs))
