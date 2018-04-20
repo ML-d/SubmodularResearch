@@ -433,6 +433,7 @@ class SelectLoss:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
+        self.sample_points = []
         self.A = tf.placeholder('float', shape=[None, 10])
         self.B = tf.placeholder('float', shape=[None, 10])
         self.res = tf.nn.softmax_cross_entropy_with_logits(labels=self.A, logits=self.B)
@@ -448,10 +449,12 @@ class SelectLoss:
         res = model.predict_proba (self.X[idx])
         res = self.fnc([self.Y[idx], res])
         res = res[0] / np.sum(res[0])
-        return np.random.choice (idx,
+        idx = np.random.choice (idx,
                                  size=self.batch_size,
                                  replace=False,
                                  p=res)
+        self.sample_points.extend(idx)
+        return idx
 
 class SelectRandom:
     """
@@ -469,7 +472,7 @@ class SelectRandom:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
-        self.sampled = []
+        self.sample_points = []
 
     def sample(self, _):
         """
@@ -483,4 +486,5 @@ class SelectRandom:
         idx = np.random.choice (t, size = self.fwd_batch_size, replace=False)
         idx = np.random.choice (idx, replace=False,
                                 size=self.batch_size)
+        self.sample_points.extend(idx)
         return idx
