@@ -443,7 +443,8 @@ class SelectLoss:
             Sort the loss values of the training samples.
             Variables
         """
-        idx = np.random.choice (np.arange (0, self.X.shape[0]), size=self.fwd_batch_size, replace=False)
+        t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.sample_points)
+        idx = np.random.choice (t, size=self.fwd_batch_size, replace=False)
         res = model.predict_proba (self.X[idx])
         res = self.fnc([self.Y[idx], res])
         res = res[0] / np.sum(res[0])
@@ -468,6 +469,7 @@ class SelectRandom:
         self.fwd_batch_size = fwd_batch_size
         self.batch_size = batch_size
         self.loss = loss
+        self.sampled = []
 
     def sample(self, _):
         """
@@ -477,7 +479,8 @@ class SelectRandom:
         model: Model for getting losses
         x_train: Full Training Samples
         """
-        idx = np.random.choice (np.arange (0, self.X.shape[0]), size = self.fwd_batch_size, replace=False)
+        t = np.setdiff1d(np.arange (0, self.X.shape[0]), self.sample_points)
+        idx = np.random.choice (t, size = self.fwd_batch_size, replace=False)
         idx = np.random.choice (idx, replace=False,
                                 size=self.batch_size)
         return idx
