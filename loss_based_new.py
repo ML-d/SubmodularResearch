@@ -32,6 +32,7 @@ def main():
     parser.add_argument ("--kernel", type=str, choices=["l2", "fro", "cosine"])
     parser.add_argument ("--folder", type=str, default="./mnist/random/")
     parser.add_argument ("--verbose", type=bool, default=True)
+    parser.add_argument ("--compute_once", type=bool, default=True)
 
     args = parser.parse_args ()
     x_train, y_train, x_test, y_test = read_data (args.dataset)
@@ -41,7 +42,7 @@ def main():
     train_model (model, x_train, y_train, x_test, y_test,
                  args.dataset, args.batch_size, args.approx_factor, args.fwd_batch_size,
                  args.loss_function, args.num_epoch,
-                 args.num_exp, args.sampler, args.optimizer, args.steps_per_epoch, args.kernel, args.folder)
+                 args.num_exp, args.sampler, args.optimizer, args.steps_per_epoch, args.kernel, args.folder, args.compute_once)
 
 if __name__ == "__main__":
     main()

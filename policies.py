@@ -105,27 +105,19 @@ class SelectSSGD:
     def compute_distance(self, model, candidate_points, sampled_points):
         self.sum_distance = np.zeros ((self.X.shape[0], 1))
         self.min_distance = np.zeros_like (self.sum_distance)
-        if not self.compute_once:
+        self.features = normalize(self.features, axis=1)
+        feat_candidates = self.features[candidate_points]
+        feat_sample = self.features[sampled_points]
+        if self.kernel=="cosine":
             start_time = time.time ()
-            idx = np.hstack ((candidate_points, sampled_points))
-            self.features = normalize(self.features, axis=1)
-            feat_candidates = self.features[candidate_points]
-            feat_sample = self.features[sampled_points]
-            feat_mat = np.dot(feat_candidates, np.transpose(feat_sample))
-            feat_mat = np.ones_like(feat_mat) - feat_mat
-            pv("feat_mat.shape")
+            feat_mat = np.dot(feat_candidates, np.transpose(feat_sample)) #cosine product
+            feat_mat = np.ones_like(feat_mat) - feat_mat #cosine distance
             self.sum_distance[candidate_points] = np.expand_dims(feat_mat.sum(axis=1) / feat_mat.shape[1], axis=1)
-            pv("self.sum_distance.shape")
             self.min_distance[candidate_points] = np.expand_dims(np.min(feat_mat, axis=1), axis=1)
-            pv("self.sum_distance.shape")
             end_time = time.time()
             tot = int (end_time - start_time)
             print ("Computation time {a} min {b} sec".format (a=tot // 60, b=tot % 60))
-        else:
-            pv ("len(sampled_points)")
-            pv ("self.kernel")
-            self.min_distance[candidate_points] = np.min (self.dist_matrix[candidate_points][:, sampled_points])
-            self.sum_distance[candidate_points] = np.mean (self.dist_matrix[candidate_points][:, sampled_points])
+
 
     def ent(self, idx, model, candidate_points):
         """
@@ -156,11 +148,6 @@ class SelectSSGD:
             else:
                 return (self.sum_distance[idx], self.min_distance[idx])
 
-        elif self.kernel == "l2":
-            if len(sampled_points) == 0:
-                return (0, 0)
-            return (self.sum_distance[idx], self.min_distance[idx])
-
     def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
         -------------------------------------------------------------------
@@ -177,10 +164,8 @@ class SelectSSGD:
             self.compute_distance(model, candidate_points, sampled_points)
 
         ent = self.ent(idx, model, candidate_points)
-        # diversity = self.diversity (idx, candidate_points, sampled_points)
         # this computes both distance and diversity
         dist, diversity = self.distance (idx, candidate_points, sampled_points)
-        # pv("alpha*ent, beta*diversity, gamma*dist")
         return alpha * ent + beta * diversity + gamma * dist
 
 
@@ -281,7 +266,7 @@ class SelectFlid:
         ----------------------------------------------------------------
         fwd_batch: Indicates sampled points from which to select batch
         entropy: Indicates the entropy of all points in fwd_batch
-        features: Indiactes the features of all points in fwd_batch
+        features: Indicates the features of all points in fwd_batch
         ----------------------------------------------------------------
         :param X: Set of Data points
         :param Y: Set of Data Labels
@@ -296,12 +281,12 @@ class SelectFlid:
         self.candidate_points = []
         self.fwd_batch_size = fwd_batch_size
         self.batch_size =batch_size
-        self.entropy = None
+        self.entropy = np.array((self.X.shape[0], 1))
         self.features = None
         self.optimizer = optimizer
 
 
-    def create_fwd_batch(self):
+    def compute_entropy(self, model, candidate_points, sampled_points):
         """
         -------------------------------------------------------------------------------
         Computes the entropy for all of the data points in fwd_batch.
@@ -309,53 +294,34 @@ class SelectFlid:
         -------------------------------------------------------------------------------
         :return: Dictionary of entropy for all of the data points in fwd_batch.
         """
-        t = np.setdiff1d (np.arange (0, self.X.shape[0]), self.optimizer.sample_points)
-        if t >= self.fwd_batch_size:
-            self.candidate_points = np.random.choice (t, size=self.fwd_batch_size, replace=False)
-        else:
-            raise ("Error")
-
-    def compute_entropy(self, model, data_points):
-        """
-        -------------------------------------------------------------------------------
-        Computes the entropy for all of the data points in fwd_batch.
-        This needs to be done only once since entropy is independent of sampled points.
-        -------------------------------------------------------------------------------
-        :param model NN model
-        :param data_points Already Sampled data_points
-        :return: Dictionary of entropy for all of the data points in fwd_batch.
-        """
-        data_points = data_points.astype(int)
-        print("type(data_points[0])", type(data_points[0]))
-        self.entropy = dict(zip(data_points, map(lambda  x: -entropy(x),
-                                              model.predict_proba (self.X[data_points]))))
-
-    def compute_features(self, model, data_points):
-        """"
-        -------------------------------------------------------------------------------
-        Computes the features for all of the data points in fwd_batch.
-        This needs to be done only once since features is independent of sampled points.
-        -------------------------------------------------------------------------------
-        :param model NN model
-        :param data_points Already sampled data points
-        :return: Dictionary of entropy for all of the data points in fwd_batch.
-        """
-        data_points = data_points.astype (int)
+        start_time = time.time()
         intermediate_layer_model = Model (inputs=model.input,
-                                          outputs=model.get_layer("features").output)
-        self.features = dict(zip(data_points, intermediate_layer_model.predict(self.X[data_points])))
+                                          outputs=[model.get_layer ("prob").output,
+                                                   model.get_layer("features").output])
+
+        idx = np.hstack((candidate_points, sampled_points))
+        idx = idx.astype("int")
+        prob, feat= intermediate_layer_model.predict (self.X[idx])
+        ent = np.array([entropy(i) for i in prob]).reshape((len(idx), 1))
+        if any(np.isnan(ent)) or any(np.isinf(ent)):
+            raise("Error")
+        self.entropy[idx] = ent
+        self.features = np.empty(shape=((self.X.shape[0], feat.shape[1])))
+        self.features[idx] = feat
+
+        end_time = time.time()
+        self.entropy = normalize(self.entropy, axis=0)
+        tot = int(end_time - start_time)
+        print("Forward Pass {a} min {b} sec".format(a=tot // 60, b=tot%60))
 
     def modular(self, idx):
         """
         :param idx: Element being added
         :return: The entropy of data point index by idx in the original data.
         """
-        if self.entropy == None:
-            self.compute_entropy()
-
         return self.entropy[idx]
 
-    def distance(self, idx, data_points):
+    def distance(self, idx, candidate_points, sampled_points):
         """
         --------------------------------------------------------------
         Compute the diversity according to the following
@@ -368,28 +334,23 @@ class SelectFlid:
         :param data_points: Already sampled data points
         :return: D(s) - D(s+1)
         """
-        if len(data_points) == 0:
-            return np.sum(self.features[idx])
+        if len(sampled_points) == 0:
+            return 0
         else:
+            feature_matrix = self.features[sampled_points]
+            temp = sampled_points.extend(idx)
+            feature_matrix_plus_idx = self.features[temp]
 
-            feature_matrix = np.array(self.features[data_points[0]])
-            for i in data_points[0:]:
-                feature_matrix = np.vstack([feature_matrix, self.features[i]])
 
-        tot = 0
-        tot = np.sum(feature_matrix, axis=0)
-        temp_matrix = feature_matrix - tot
-        max_col = np.max(temp_matrix, axis=1)
+        mean = np.sum(feature_matrix, axis=1)
+        feature_matrix = feature_matrix - mean
+        val_prev = np.sum(np.max(feature_matrix, axis=1))
+        mean = np.sum (feature_matrix_plus_idx, axis=1)
+        feature_matrix_plus_idx = feature_matrix_plus_idx - mean
+        val = np.sum(np.max(feature_matrix_plus_idx, axis=1))
+        return val - val_prev
 
-        feature_matrix = np.vstack([self.features[idx], feature_matrix])
-
-        tot = np.sum (feature_matrix, axis=0)
-        temp_matrix = feature_matrix - tot
-        new_max_col = np.max(temp_matrix, axis=0)
-
-        return np.sum(new_max_col) - np.sum(max_col)
-
-    def marginal_gain(self, idx, model, data_points):
+    def marginal_gain(self, idx, model, candidate_points, sampled_points, compute_entropy):
         """
         Computes the entropy of the given data points
         :param idx: Element being added
@@ -397,11 +358,9 @@ class SelectFlid:
         :param data_points: already sampled points
         :return:
         """
-        if self.entropy == None:
-            self.compute_entropy(model, np.hstack((self.candidate_points, data_points)))
-        if self.features == None:
-            self.compute_features(model, np.hstack((self.candidate_points, data_points)))
-        return self.modular(idx) + self.distance(idx, data_points)
+        if compute_entropy == 1 :
+            self.compute_entropy(model, candidate_points, sampled_points)
+        return self.modular(idx) + self.distance(idx, candidate_points, sampled_points)
 
     def sample(self, model):
         """
@@ -411,9 +370,6 @@ class SelectFlid:
         Sample using optimizer.
         Variables
         """
-        self.create_fwd_batch()
-        self.entropy = None
-        self.features = None
         return  self.optimizer.sample (model, self.marginal_gain, self.candidate_points)
 
 class SelectLoss:

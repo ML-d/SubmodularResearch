@@ -1,4 +1,5 @@
 from new_code.policies import *
+from scipy.special import kl_div
 
 def softmax(x):
     """
@@ -16,7 +17,7 @@ def softmax(x):
 def train_model(model, x_train, y_train, x_test, y_test,
                 dataset, batch_size, approx_factor, fwd_batch_size, loss_function,
                 num_epoch, num_exp, sampler, optimizer,
-                steps_per_epoch, kernel, folder):
+                steps_per_epoch, kernel, folder, compute_once):
     """
 
     :param model: Neural Network Model
@@ -54,7 +55,7 @@ def train_model(model, x_train, y_train, x_test, y_test,
             optimizer = ProbGreedy (x_train, y_train, fwd_batch_size, batch_size, approx_factor)
 
         if sampler == 'ssgd':
-            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel, dataset, 1)
+            sampler = SelectSSGD ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel, dataset, compute_once)
             reset = 1
         elif sampler == 'random':
             sampler = SelectRandom ( x_train, y_train, fwd_batch_size, batch_size, optimizer, loss_function, kernel)
@@ -108,6 +109,9 @@ def train_model(model, x_train, y_train, x_test, y_test,
                     # Train on the sampled data
                     t_loss, t_acc = model.train_on_batch (x_train[idxs], y_train[idxs])
                     if (ab % 15 == 0):
+                        var = np.var(x_train[idxs])
+                        kl = kl_div(np.bincount(y_train[idxs]),
+                                                  np.bincount(np.random.uniform(0, batch_size, (batch_size, 1))))
                         train_loss.append (t_loss)
                         train_acc.append (t_acc)
                         v_loss, v_acc = model.evaluate (x_test, y_test, batch_size=batch_size, verbose=False)
