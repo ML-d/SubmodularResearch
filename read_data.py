@@ -10,6 +10,25 @@ from keras.datasets import cifar100
 from keras.datasets import fashion_mnist
 from keras.datasets import mnist
 
+def create_imbalanced(x_train, y_train, **kwargs):
+    """
+    The function creates a imbalenced samples.
+    This is done using sampling given from class lables
+    in a ratio given.
+    :param
+    kwargs: (class_label, sampling_ratio)
+    """
+
+    data = list (zip (np.arange (0, len (y_train)), y_train))
+    data = np.array (data)
+    idx = []
+    for key, value in kwargs.items ():
+        key = int (key)
+        value = float (value)
+        candidates = data[data[:, 1] == key][:, 0]
+        idx.extend (np.random.choice (candidates, size=int (len (candidates) * value), replace=False))
+    return idx
+
 def read_data(dataset):
     """
     Download the data
@@ -48,7 +67,13 @@ def read_data(dataset):
             x_test, y_test = data["test"]
             V = data["vocab"]
 
-
+    if (dataset == "im-mnist"):
+        (x_train, y_train), (x_test, y_test) = mnist.load_data ()
+        kw = {'0': '0.01', '1': '0.01', '2': '0.01', '3': '0.02', '4': '0.5', '5': '0.011', '6': '0.01', '7': '0.01',
+              '8': '0.01', '9': '0.4'}
+        idx = np.array (create_imbalanced (x_train, y_train, **kw))
+        x_train = x_train[idx]
+        y_train = y_train[idx]
 
     if dataset != "ptb":
         # Convert class vectors to binary class matrices.

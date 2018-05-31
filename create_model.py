@@ -23,7 +23,7 @@ def create_model(input_shape, output_size, loss_function, dataset):
     print ("Dataset", dataset)
     print (" output size", output_size)
 
-    if dataset == 'mnist' or dataset == 'fmnist':
+    if dataset == 'mnist' or dataset == 'fmnist' or dataset == "im-mnist":
         print ("--------------", input_shape)
         model = Sequential ([
             # conv1_*

@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--approx_factor", type=int, default=1)
     parser.add_argument ("--fwd_batch_size", type=int, default=1024)
     parser.add_argument ("--loss_function", type=str, default="categorical_crossentropy")
-    parser.add_argument ("--dataset", type=str, choices=['mnist', 'fmnist', 'cifar10', 'cifar100', 'svnh', 'ptb'])
+    parser.add_argument ("--dataset", type=str, choices=['mnist', 'im-mnist', 'fmnist', 'cifar10', 'cifar100', 'svnh', 'ptb'])
     parser.add_argument ("--kernel", type=str, choices=["l2", "fro", "cosine"])
     parser.add_argument ("--folder", type=str, default="./mnist/random/")
     parser.add_argument ("--verbose", type=bool, default=True)
@@ -39,6 +39,7 @@ def main():
     if args.steps_per_epoch == None:
         args.steps_per_epoch = (x_train.shape[0] // args.batch_size)
     model = create_model (x_train.shape[1:], y_train.shape[1], args.loss_function, args.dataset)
+    print("model", model)
     train_model (model, x_train, y_train, x_test, y_test,
                  args.dataset, args.batch_size, args.approx_factor, args.fwd_batch_size,
                  args.loss_function, args.num_epoch,

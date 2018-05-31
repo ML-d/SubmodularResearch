@@ -80,23 +80,23 @@ class Greedy (Optimisation):
         :param max_val:
         :return:
         """
-        temp = []
         val = []
+        self.sample_points = []
         self.create_fwd_batch ()
-        compute_entropy = 1
         for _ in range(0, self.cardinality):
+            compute_entropy = 1
             for j in self.candidate_points:
                 # We now send
-                val.append((j, fnc (j, model, self. candidate_points, self.temp, compute_entropy)))
-                compute_entropy = 0
-                # Thinking of the model as a probability submodular function.
-                # There is no need for computing actual prob values as we require
-                # only a idea of ratios. We are sampling self.cardianlity points
-                sorted(val, key=itemgetter(1), reverse=True)
-                keys = [i[0] for i in val]
-                self.sample_points.extend (keys[0:self.cardinality])
-                temp.extend(keys[0:self.cardinality])
-        return temp
+                val.append((j, fnc (j, model, self. candidate_points, self.sample_points, compute_entropy)))
+            # Thinking of the model as a probability submodular function.
+            # There is no need for computing actual prob values as we require
+            # only a idea of ratios. We are sampling self.cardianlity points
+            sorted(val, key=itemgetter(1), reverse=True)
+            keys = [i[0] for i in val]
+            self.sample_points.append (keys[0])
+            self.candidate_points = np.setdiff1d(self.candidate_points, keys[0])
+        return self.sample_points
+
 # ToDo Update implementation of ProbGreedy and LazyGreedy
 class dictionary_heap(object):
 

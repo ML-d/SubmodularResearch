@@ -68,7 +68,7 @@ class SelectSSGD:
         self.dist_matrix = None
         self.dataset = dataset
         self.compute_once = compute_once
-        self.compute_once_distance()
+        # self.compute_once_distance()
 
     def compute_once_distance(self):
         self.dist_matrix = read_distances(self.dataset, self.kernel)
@@ -103,15 +103,15 @@ class SelectSSGD:
         print("Forward Pass {a} min {b} sec".format(a=tot // 60, b=tot%60))
 
     def compute_distance(self, model, candidate_points, sampled_points):
-        self.sum_distance = np.zeros ((self.X.shape[0], 1))
-        self.min_distance = np.zeros_like (self.sum_distance)
+        self.sum_distance = np.zeros((self.X.shape[0], 1))
+        self.min_distance = np.zeros_like(self.sum_distance)
         self.features = normalize(self.features, axis=1)
         feat_candidates = self.features[candidate_points]
         feat_sample = self.features[sampled_points]
         if self.kernel=="cosine":
             start_time = time.time ()
-            feat_mat = np.dot(feat_candidates, np.transpose(feat_sample)) #cosine product
-            feat_mat = np.ones_like(feat_mat) - feat_mat #cosine distance
+            feat_mat = np.dot(feat_candidates, np.transpose(feat_sample))  # cosine product
+            feat_mat = np.ones_like(feat_mat) - feat_mat  # cosine distance
             self.sum_distance[candidate_points] = np.expand_dims(feat_mat.sum(axis=1) / feat_mat.shape[1], axis=1)
             self.min_distance[candidate_points] = np.expand_dims(np.min(feat_mat, axis=1), axis=1)
             end_time = time.time()
@@ -312,7 +312,7 @@ class SelectFlid:
         end_time = time.time()
         self.entropy = normalize(self.entropy, axis=0)
         tot = int(end_time - start_time)
-        print("Forward Pass {a} min {b} sec".format(a=tot // 60, b=tot%60))
+        # print("Forward Pass {a} min {b} sec".format(a=tot // 60, b=tot%60))
 
     def modular(self, idx):
         """
@@ -409,7 +409,6 @@ class SelectLoss:
                                  size=self.batch_size,
                                  replace=False,
                                  p=res)
-        self.sample_points.extend(idx)
         return idx
 
 class SelectRandom:
@@ -442,5 +441,4 @@ class SelectRandom:
         idx = np.random.choice (t, size = self.fwd_batch_size, replace=False)
         idx = np.random.choice (idx, replace=False,
                                 size=self.batch_size)
-        self.sample_points.extend(idx)
         return idx

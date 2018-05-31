@@ -98,20 +98,14 @@ def train_model(model, x_train, y_train, x_test, y_test,
             while epoch < num_epoch:
                 print("---------------------------------")
                 # Importance sampling is done here
-                # After Every epoch sample_points are reinitialized
-                if sampler == "random" or sampler == "loss":
-                    sampler.sample_points = []
-                else:
-                    optimizer.sample_points = []
                 for ab in range (steps_per_epoch):
                     idxs = sampler.sample (model)
                     print("idxs.shape" , len(idxs))
                     # Train on the sampled data
                     t_loss, t_acc = model.train_on_batch (x_train[idxs], y_train[idxs])
                     if (ab % 15 == 0):
-                        var = np.var(x_train[idxs])
-                        kl = kl_div(np.bincount(y_train[idxs]),
-                                                  np.bincount(np.random.uniform(0, batch_size, (batch_size, 1))))
+                        print("Train Loss", train_loss)
+                        print("Val Accuracy", v_acc)
                         train_loss.append (t_loss)
                         train_acc.append (t_acc)
                         v_loss, v_acc = model.evaluate (x_test, y_test, batch_size=batch_size, verbose=False)
